@@ -3,4 +3,6 @@ Pillow==10.1.0
 python-decouple==3.8
 djangorestframework==3.14.0
 django-filter==23.5
-WeasyPrint==56.1 
+WeasyPrint==56.1
+sentry-sdk[django]==1.38.0
+django-cors-headers==4.3.1 
