@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Отчет о фильме: {{ movie.title }}</title>
+    <style>
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .movie-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .review-item {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #3498db;
+        }
+        .rating-item {
+            display: inline-block;
+            margin: 5px;
+            padding: 5px 10px;
+            background-color: #e8f4fd;
+            border-radius: 15px;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Отчет о {{ movie.get_type_display|lower }}{% if movie.type == 'movie' %}е{% endif %}</h1>
+        <h2>{{ movie.title }}</h2>
+        <p>Сгенерировано: {{ "now"|date:"d.m.Y H:i" }}</p>
+    </div>
+
+    <div class="movie-info">
+        <h3>📋 Основная информация</h3>
+        <p><strong>Название:</strong> {{ movie.title }}</p>
+        <p><strong>Тип:</strong> {{ movie.get_type_display }}</p>
+        <p><strong>Дата выхода:</strong> {{ movie.release_date|date:"d.m.Y" }}</p>
+        {% if movie.country %}
+            <p><strong>Страна:</strong> {{ movie.country }}</p>
+        {% endif %}
+        {% if movie.duration %}
+            <p><strong>Продолжительность:</strong> {{ movie.duration }} мин.</p>
+        {% endif %}
+        {% if movie.seasons_count %}
+            <p><strong>Сезонов:</strong> {{ movie.seasons_count }}</p>
+        {% endif %}
+        {% if movie.episodes_count %}
+            <p><strong>Эпизодов:</strong> {{ movie.episodes_count }}</p>
+        {% endif %}
+        <p><strong>Жанры:</strong> 
+            {% for genre in movie.genres.all %}
+                {{ genre.name }}{% if not forloop.last %}, {% endif %}
+            {% empty %}
+                Не указаны
+            {% endfor %}
+        </p>
+        {% if movie.description %}
+            <p><strong>Описание:</strong> {{ movie.description|truncatewords:50 }}</p>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <h3>📈 Статистика</h3>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value">{{ average_rating|floatformat:1 }}/10</div>
+                <div>Средняя оценка</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ ratings_count }}</div>
+                <div>Оценок</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ reviews_count }}</div>
+                <div>Отзывов</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">{{ actors.count }}</div>
+                <div>Актеров</div>
+            </div>
+        </div>
+    </div>
+
+    {% if directors %}
+    <div class="section">
+        <h3>🎬 Режиссеры</h3>
+        {% for director in directors %}
+            <p>• {{ director.full_name }}{% if director.birth_date %} ({{ director.birth_date|date:"Y" }} г.р.){% endif %}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if actors %}
+    <div class="section">
+        <h3>🎭 Актеры</h3>
+        {% for actor in actors %}
+            <p>• {{ actor.full_name }}{% if actor.birth_date %} ({{ actor.birth_date|date:"Y" }} г.р.){% endif %}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if reviews %}
+    <div class="section">
+        <h3>💬 Последние отзывы</h3>
+        {% for review in reviews %}
+            <div class="review-item">
+                <p><strong>{{ review.user.username }}</strong> - {{ review.created_at|date:"d.m.Y" }}</p>
+                <p>{{ review.review_text|truncatewords:30 }}</p>
+                <small>👍 {{ review.likes_count }} | 👎 {{ review.dislikes_count }}</small>
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if ratings %}
+    <div class="section">
+        <h3>⭐ Последние оценки</h3>
+        {% for rating in ratings %}
+            <span class="rating-item">
+                {{ rating.user.username }}: {{ rating.rating_value }}/10
+            </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>FilmSearch - Система управления фильмами и сериалами</p>
+        <p>Отчет сгенерирован автоматически</p>
+    </div>
+</body>
+</html> 

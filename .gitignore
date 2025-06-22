@@ -1,0 +1,34 @@
+# Папка с тестовыми файлами
+skip/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.log
+
+# Django
+db.sqlite3
+media/
+static/
+*.sqlite3
+
+# Виртуальное окружение
+venv/
+env/
+
+# React
+node_modules/
+filmsearch-frontend/build/
+npm-debug.log*
+filmsearch/movies/management/commands/fill_db.py
+filmsearch/movies/templates/movies/
+
+# IDE
+.vscode/
+.idea/
+
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak 

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Сводный отчет по фильмам</title>
+    <style>
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-stats {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .movie-item {
+            background-color: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+        .movie-title {
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .movie-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        .movie-description {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-style: italic;
+            margin-top: 10px;
+        }
+        .stats-inline {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .genre-tags {
+            margin-top: 10px;
+        }
+        .genre-tag {
+            display: inline-block;
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 12px;
+            color: #7f8c8d;
+            border-top: 1px solid #dee2e6;
+            padding-top: 20px;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Сводный отчет по фильмам и сериалам</h1>
+        <p>Сгенерировано: {{ report_date|date:"d.m.Y H:i" }}</p>
+    </div>
+
+    <div class="summary-stats">
+        <h3>📈 Общая статистика</h3>
+        <p><strong>Всего фильмов и сериалов:</strong> {{ total_movies }}</p>
+        <p><strong>Фильмов:</strong> {{ movies|length|add:"-1" }}</p>
+        <p><strong>Сериалов:</strong> {{ movies|length|add:"-1" }}</p>
+    </div>
+
+    <div class="movies-list">
+        <h3>🎬 Список фильмов и сериалов</h3>
+        {% for movie in movies %}
+            <div class="movie-item">
+                <div class="movie-title">
+                    {{ movie.title }} ({{ movie.get_type_display }})
+                </div>
+                
+                <div class="movie-info">
+                    <div>
+                        <strong>Дата выхода:</strong> {{ movie.release_date|date:"d.m.Y" }}<br>
+                        {% if movie.country %}
+                            <strong>Страна:</strong> {{ movie.country }}<br>
+                        {% endif %}
+                        {% if movie.duration %}
+                            <strong>Продолжительность:</strong> {{ movie.duration }} мин.<br>
+                        {% endif %}
+                        {% if movie.seasons_count %}
+                            <strong>Сезонов:</strong> {{ movie.seasons_count }}<br>
+                        {% endif %}
+                        {% if movie.episodes_count %}
+                            <strong>Эпизодов:</strong> {{ movie.episodes_count }}<br>
+                        {% endif %}
+                    </div>
+                    <div class="stats-inline">
+                        <strong>Статистика:</strong><br>
+                        ⭐ Рейтинг: {{ movie.ratings.all|length }} оценок<br>
+                        💬 Отзывов: {{ movie.reviews.all|length }}<br>
+                        📅 Добавлено: {{ movie.created_at|date:"d.m.Y" }}
+                    </div>
+                </div>
+
+                {% if movie.description %}
+                    <div class="movie-description">
+                        {{ movie.description|truncatewords:25 }}
+                    </div>
+                {% endif %}
+
+                <div class="genre-tags">
+                    <strong>Жанры:</strong>
+                    {% for genre in movie.genres.all %}
+                        <span class="genre-tag">{{ genre.name }}</span>
+                    {% empty %}
+                        <span class="genre-tag">Не указаны</span>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if forloop.counter|divisibleby:3 %}
+                <div class="page-break"></div>
+            {% endif %}
+        {% empty %}
+            <p>Нет фильмов для отображения.</p>
+        {% endfor %}
+    </div>
+
+    <div class="footer">
+        <p>FilmSearch - Система управления фильмами и сериалами</p>
+        <p>Сводный отчет сгенерирован автоматически</p>
+        <p>Всего записей: {{ total_movies }}</p>
+    </div>
+</body>
+</html> 
