@@ -582,9 +582,9 @@ class MovieListView(ListView):
         search_query = self.request.GET.get('search')
         if search_query:
             queryset = queryset.filter(
-                models.Q(title__contains=search_query) |
-                models.Q(description__contains=search_query) |
-                models.Q(country__contains=search_query)
+                Q(title__contains=search_query) |
+                Q(description__contains=search_query) |
+                Q(country__contains=search_query)
             )
         
         genre_filter = self.request.GET.get('genre')
