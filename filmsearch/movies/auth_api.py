@@ -1,17 +1,25 @@
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from .models import Collection, CollectionItem, MovieTVShow, Review, Rating, Recommendation, Genre, UserProfile
 from .forms import CustomUserCreationForm
+from typing import Any, Dict, Optional
 import json
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def register_api(request):
-    """API для регистрации пользователя"""
+def register_api(request: HttpRequest) -> JsonResponse:
+    """
+    API для регистрации пользователя.
+    Принимает JSON с данными пользователя, создает пользователя и профиль.
+    Args:
+        request: HttpRequest
+    Returns:
+        JsonResponse: Результат регистрации
+    """
     try:
         data = json.loads(request.body)
         form = CustomUserCreationForm(data)
@@ -51,8 +59,15 @@ def register_api(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def login_api(request):
-    """API входа"""
+def login_api(request: HttpRequest) -> JsonResponse:
+    """
+    API входа пользователя.
+    Принимает JSON с username и password, выполняет аутентификацию и вход.
+    Args:
+        request: HttpRequest
+    Returns:
+        JsonResponse: Результат входа
+    """
     try:
         data = json.loads(request.body)
         username = data.get('username')
@@ -101,8 +116,15 @@ def login_api(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def logout_api(request):
-    """API выход"""
+def logout_api(request: HttpRequest) -> JsonResponse:
+    """
+    API выхода пользователя.
+    Завершает сессию пользователя, если он авторизован.
+    Args:
+        request: HttpRequest
+    Returns:
+        JsonResponse: Результат выхода
+    """
     try:
         if request.user.is_authenticated:
             username = request.user.username
@@ -126,8 +148,15 @@ def logout_api(request):
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
-def profile_api(request):
-    """API профиля пользователя"""
+def profile_api(request: HttpRequest) -> JsonResponse:
+    """
+    API профиля пользователя.
+    Возвращает информацию о текущем пользователе, если он авторизован.
+    Args:
+        request: HttpRequest
+    Returns:
+        JsonResponse: Данные профиля пользователя
+    """
     try:
         if request.user.is_authenticated:
             return JsonResponse({
@@ -159,8 +188,16 @@ def profile_api(request):
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
-def collections_api(request):
-    """API для подборок"""
+def collections_api(request: HttpRequest) -> JsonResponse:
+    """
+    API для работы с подборками.
+    GET: возвращает список подборок.
+    POST: создает новую подборку для авторизованного пользователя.
+    Args:
+        request: HttpRequest
+    Returns:
+        JsonResponse: Результат операции
+    """
     try:
         if request.method == 'GET':
             # Получение списка подборок
@@ -235,8 +272,15 @@ def collections_api(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
-def admin_dashboard_api(request):
-    """API для админ-панели"""
+def admin_dashboard_api(request: HttpRequest) -> JsonResponse:
+    """
+    API для админ-панели.
+    Возвращает статистику, последние фильмы, отзывы и топ пользователей.
+    Args:
+        request: HttpRequest
+    Returns:
+        JsonResponse: Данные для админ-панели
+    """
     try:
         if not request.user.is_authenticated:
             return JsonResponse({
@@ -316,8 +360,15 @@ def admin_dashboard_api(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def generate_recommendations_api(request):
-    """API для генерации рекомендаций без CSRF"""
+def generate_recommendations_api(request: HttpRequest) -> JsonResponse:
+    """
+    API для генерации рекомендаций (только для администратора).
+    Создает рекомендации для всех пользователей по топ-рейтинговым фильмам.
+    Args:
+        request: HttpRequest
+    Returns:
+        JsonResponse: Результат генерации
+    """
     try:
         if not request.user.is_authenticated:
             return JsonResponse({
@@ -375,8 +426,16 @@ def generate_recommendations_api(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def moderate_review_api(request, review_id):
-    """API для модерации отзывов администратором"""
+def moderate_review_api(request: HttpRequest, review_id: int) -> JsonResponse:
+    """
+    API для модерации отзывов администратором.
+    Позволяет одобрять или отклонять отзывы.
+    Args:
+        request: HttpRequest
+        review_id: int — ID отзыва
+    Returns:
+        JsonResponse: Результат модерации
+    """
     try:
         if not request.user.is_authenticated:
             return JsonResponse({
@@ -442,8 +501,15 @@ def moderate_review_api(request, review_id):
 
 @csrf_exempt
 @require_http_methods(["GET"])
-def pending_reviews_api(request):
-    """API для получения отзывов на модерации"""
+def pending_reviews_api(request: HttpRequest) -> JsonResponse:
+    """
+    API для получения отзывов на модерации.
+    Возвращает список отзывов со статусом 'pending'.
+    Args:
+        request: HttpRequest
+    Returns:
+        JsonResponse: Список отзывов на модерации
+    """
     try:
         if not request.user.is_authenticated:
             return JsonResponse({

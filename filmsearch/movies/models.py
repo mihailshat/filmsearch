@@ -3,9 +3,10 @@ from django.contrib.auth.models import User
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, date
 import datetime
 from django.urls import reverse
+from typing import Optional, Union
 
 
 class Genre(models.Model):
@@ -18,7 +19,12 @@ class Genre(models.Model):
         verbose_name_plural = _('Жанры')
         ordering = ['name']
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Строковое представление жанра.
+        Returns:
+            str: Название жанра
+        """
         return self.name
 
 
@@ -51,10 +57,15 @@ class ActorDirector(models.Model):
         verbose_name_plural = _('Актеры/Режиссеры')
         ordering = ['full_name']
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Строковое представление актера/режиссера.
+        Returns:
+            str: Полное имя актера/режиссера
+        """
         return self.full_name
     
-    def get_age(self):
+    def get_age(self) -> Optional[int]:
         """
         Пример 1: Расчет возраста актера/режиссера на текущую дату
         
@@ -64,6 +75,10 @@ class ActorDirector(models.Model):
         Такая функциональность может использоваться при отображении профиля 
         актера/режиссера, чтобы показать его текущий возраст без необходимости 
         обновления этой информации вручную.
+        
+        Расчет возраста актера/режиссера на текущую дату.
+        Returns:
+            Optional[int]: Возраст в годах или None, если дата рождения не указана
         """
         if not self.birth_date:
             return None
@@ -79,10 +94,11 @@ class ActorDirector(models.Model):
             
         return age
     
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         """
-        Возвращает URL для просмотра деталей актера/режиссера.
-        Используется в шаблонах для создания ссылок и редиректов после формы.
+        URL для просмотра деталей актера/режиссера.
+        Returns:
+            str: URL страницы актера/режиссера
         """
         return reverse('actor_director_detail', kwargs={'pk': self.pk})
 
@@ -91,48 +107,96 @@ class MovieTVShowManager(models.Manager):
     """Собственный менеджер для модели MovieTVShow"""
     
     def get_queryset(self):
-        """Возвращает базовый QuerySet"""
+        """
+        Возвращает базовый QuerySet.
+        Returns:
+            QuerySet: Базовый QuerySet для MovieTVShow
+        """
         return super().get_queryset()
     
     def movies_only(self):
-        """Возвращает только фильмы"""
+        """
+        Возвращает только фильмы.
+        Returns:
+            QuerySet: QuerySet только с фильмами
+        """
         return self.filter(type='movie')
     
     def tv_shows_only(self):
-        """Возвращает только сериалы"""
+        """
+        Возвращает только сериалы.
+        Returns:
+            QuerySet: QuerySet только с сериалами
+        """
         return self.filter(type='tv_show')
     
-    def released_after(self, date):
-        """Возвращает фильмы/сериалы, вышедшие после указанной даты"""
+    def released_after(self, date: date):
+        """
+        Возвращает фильмы/сериалы, вышедшие после указанной даты.
+        Args:
+            date: Дата, после которой искать фильмы/сериалы
+        Returns:
+            QuerySet: QuerySet с фильмами/сериалами после указанной даты
+        """
         return self.filter(release_date__gt=date)
     
-    def top_rated(self, limit=10):
-        """Возвращает топ фильмов/сериалов по средней оценке"""
+    def top_rated(self, limit: int = 10):
+        """
+        Возвращает топ фильмов/сериалов по средней оценке.
+        Args:
+            limit: Количество фильмов/сериалов в топе
+        Returns:
+            QuerySet: QuerySet с топ фильмами/сериалами по рейтингу
+        """
         from django.db.models import Avg, Count
         return self.annotate(
             avg_rating=Avg('ratings__rating_value'),
             ratings_count=Count('ratings')
         ).filter(ratings_count__gt=0).order_by('-avg_rating')[:limit]
     
-    def most_reviewed(self, limit=10):
-        """Возвращает самые обсуждаемые фильмы/сериалы по количеству отзывов"""
+    def most_reviewed(self, limit: int = 10):
+        """
+        Возвращает самые обсуждаемые фильмы/сериалы по количеству отзывов.
+        Args:
+            limit: Количество фильмов/сериалов
+        Returns:
+            QuerySet: QuerySet с самыми обсуждаемыми фильмами/сериалами
+        """
         from django.db.models import Count
         return self.annotate(
             reviews_count=Count('reviews')
         ).order_by('-reviews_count')[:limit]
     
-    def by_genre(self, genre_name):
-        """Возвращает фильмы/сериалы определенного жанра"""
+    def by_genre(self, genre_name: str):
+        """
+        Возвращает фильмы/сериалы определенного жанра.
+        Args:
+            genre_name: Название жанра для поиска
+        Returns:
+            QuerySet: QuerySet с фильмами/сериалами указанного жанра
+        """
         return self.filter(genres__name__icontains=genre_name)
     
-    def new_releases(self, days=30):
-        """Возвращает новинки, вышедшие за последние N дней"""
+    def new_releases(self, days: int = 30):
+        """
+        Возвращает новинки, вышедшие за последние N дней.
+        Args:
+            days: Количество дней для поиска новинок
+        Returns:
+            QuerySet: QuerySet с новинками за указанный период
+        """
         from django.utils import timezone
         date_threshold = timezone.now().date() - timezone.timedelta(days=days)
         return self.filter(release_date__gte=date_threshold).order_by('-release_date')
     
-    def with_actor(self, actor_name):
-        """Возвращает фильмы/сериалы с определенным актером"""
+    def with_actor(self, actor_name: str):
+        """
+        Возвращает фильмы/сериалы с определенным актером.
+        Args:
+            actor_name: Имя актера для поиска
+        Returns:
+            QuerySet: QuerySet с фильмами/сериалами указанного актера
+        """
         return self.filter(
             actors_directors__full_name__icontains=actor_name,
             actor_director_roles__role='actor'
@@ -192,20 +256,35 @@ class MovieTVShow(models.Model):
         verbose_name_plural = _('Фильмы/Сериалы')
         ordering = ['-release_date']
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Строковое представление фильма/сериала.
+        Returns:
+            str: Название фильма/сериала
+        """
         return self.title
 
-    def get_average_rating(self):
+    def get_average_rating(self) -> float:
+        """
+        Вычисление среднего рейтинга фильма/сериала.
+        Returns:
+            float: Средний рейтинг или 0, если нет оценок
+        """
         ratings = self.ratings.all()
         if not ratings:
             return 0
         return sum(r.rating_value for r in ratings) / len(ratings)
     
     @property
-    def average_rating(self):
+    def average_rating(self) -> float:
+        """
+        Свойство для получения среднего рейтинга.
+        Returns:
+            float: Средний рейтинг фильма/сериала
+        """
         return self.get_average_rating()
     
-    def days_since_release(self):
+    def days_since_release(self) -> Optional[int]:
         """
         Пример 2: Расчет количества дней с момента выхода фильма/сериала
         
@@ -216,6 +295,9 @@ class MovieTVShow(models.Model):
         - Определения "новинок" (фильмы, вышедшие менее 30 дней назад)
         - Расчета показателей популярности с учетом времени
         - Формирования специальных подборок типа "Классика" (более 10 лет) или "Новинки"
+        
+        Returns:
+            Optional[int]: Количество дней с момента выхода или None, если дата не указана
         """
         if not self.release_date:
             return None
@@ -223,15 +305,23 @@ class MovieTVShow(models.Model):
         today = timezone.now().date()
         return (today - self.release_date).days
     
-    def is_new_release(self):
-        """Проверяет, является ли фильм/сериал новинкой (вышел менее 30 дней назад)"""
+    def is_new_release(self) -> bool:
+        """
+        Проверяет, является ли фильм/сериал новинкой (вышел менее 30 дней назад).
+        Returns:
+            bool: True если фильм/сериал новинка, False в противном случае
+        """
         days = self.days_since_release()
         if days is None:
             return False
         return days <= 30
     
-    def clean(self):
-        """Дополнительная валидация модели"""
+    def clean(self) -> None:
+        """
+        Дополнительная валидация модели.
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         super().clean()
         
         if self.title and self.release_date:
@@ -270,15 +360,20 @@ class MovieTVShow(models.Model):
                     'seasons_count': 'Для сериалов количество сезонов обязательно'
                 })
     
-    def save(self, *args, **kwargs):
-        """Переопределяем save для вызова clean"""
+    def save(self, *args, **kwargs) -> None:
+        """
+        Переопределяем save для вызова clean.
+        """
         self.full_clean()
         super().save(*args, **kwargs)
     
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         """
         Возвращает URL для просмотра деталей фильма/сериала.
         Используется в шаблонах для создания ссылок и редиректов после формы.
+        
+        Returns:
+            str: URL страницы фильма/сериала
         """
         return reverse('movie_detail', kwargs={'pk': self.pk})
 
@@ -310,7 +405,12 @@ class MovieTVShowActorDirector(models.Model):
         verbose_name_plural = _('Роли в фильмах/сериалах')
         unique_together = ('movie_tvshow', 'actor_director', 'role')
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Строковое представление роли актера/режиссера.
+        Returns:
+            str: Строка с именем актера/режиссера, ролью и названием фильма
+        """
         return f"{self.actor_director} - {self.get_role_display()} в {self.movie_tvshow}"
 
 
@@ -345,35 +445,64 @@ class Collection(models.Model):
         verbose_name_plural = _('Подборки')
         ordering = ['-created_at']
 
-    def __str__(self):
-        prefix = '[Системная] ' if self.is_system else ''
-        user_suffix = f" ({self.user.username})" if self.user else ""
-        return f"{prefix}{self.title}{user_suffix}"
-    
-    def get_items_count(self):
-        """Получить количество элементов в подборке"""
+    def __str__(self) -> str:
+        """
+        Строковое представление подборки.
+        Returns:
+            str: Название подборки
+        """
+        return self.title
+
+    def get_items_count(self) -> int:
+        """
+        Количество фильмов/сериалов в подборке.
+        Returns:
+            int: Количество элементов в подборке
+        """
         return self.items.count()
-    
-    def clean(self):
-        """Проверяет корректность данных перед сохранением"""
-        if self.is_system:
-            # Системные подборки всегда публичны
-            self.is_public = True
+
+    def clean(self) -> None:
+        """
+        Валидация подборки.
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
+        super().clean()
+        
+        if not self.title:
+            raise ValidationError({
+                'title': 'Название подборки обязательно'
+            })
+        
+        if len(self.title) < 2:
+            raise ValidationError({
+                'title': 'Название подборки должно содержать минимум 2 символа'
+            })
+        
+        if len(self.title) > 255:
+            raise ValidationError({
+                'title': 'Название подборки не может быть длиннее 255 символов'
+            })
+        
+        # Проверяем уникальность названия для пользователя
+        if self.user:
+            existing_collections = Collection.objects.filter(
+                title__iexact=self.title,
+                user=self.user
+            )
+            if self.pk:
+                existing_collections = existing_collections.exclude(pk=self.pk)
             
-        if self.is_system and self.user:
-            # Системные подборки не должны быть привязаны к пользователю
-            raise ValidationError({'user': _('Системные подборки не должны быть привязаны к пользователю')})
-            
-        if not self.is_system and not self.user:
-            # Пользовательские подборки должны быть привязаны к пользователю
-            raise ValidationError({'user': _('Пользовательские подборки должны быть привязаны к пользователю')})
-    
-    def save(self, *args, **kwargs):
-        """Переопределяем сохранение для автоматической корректировки полей"""
-        if self.is_system:
-            # Системные подборки всегда публичны
-            self.is_public = True
-            
+            if existing_collections.exists():
+                raise ValidationError({
+                    'title': f'Подборка с названием "{self.title}" уже существует'
+                })
+
+    def save(self, *args, **kwargs) -> None:
+        """
+        Переопределяем save для вызова clean.
+        """
+        self.full_clean()
         super().save(*args, **kwargs)
 
 
@@ -398,8 +527,13 @@ class CollectionItem(models.Model):
         verbose_name_plural = _('Элементы подборок')
         unique_together = ('collection', 'movie_tvshow')
 
-    def __str__(self):
-        return f"{self.movie_tvshow.title} в {self.collection.title}"
+    def __str__(self) -> str:
+        """
+        Строковое представление элемента подборки.
+        Returns:
+            str: Строка с названием фильма и подборки
+        """
+        return f"{self.movie_tvshow.title} в подборке {self.collection.title}"
 
 
 class UserProfile(models.Model):
@@ -423,8 +557,13 @@ class UserProfile(models.Model):
         verbose_name = _('Профиль пользователя')
         verbose_name_plural = _('Профили пользователей')
 
-    def __str__(self):
-        return f"Профиль пользователя {self.user.username}"
+    def __str__(self) -> str:
+        """
+        Строковое представление профиля пользователя.
+        Returns:
+            str: Имя пользователя
+        """
+        return self.user.username
 
 
 class UserGenrePreference(models.Model):
@@ -441,13 +580,22 @@ class UserGenrePreference(models.Model):
         verbose_name=_('Жанр'),
         related_name='user_preferences'
     )
+    preference_score = models.IntegerField(_('Оценка предпочтения'), default=1, 
+                                          help_text=_('Оценка от 1 до 10, где 10 - максимальное предпочтение'))
+    created_at = models.DateTimeField(_('Дата создания'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('Дата обновления'), auto_now=True)
 
     class Meta:
         verbose_name = _('Предпочтение пользователя по жанру')
         verbose_name_plural = _('Предпочтения пользователей по жанрам')
         unique_together = ('user', 'genre')
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Строковое представление предпочтения пользователя по жанру.
+        Returns:
+            str: Строка с именем пользователя и жанром
+        """
         return f"{self.user.username} - {self.genre.name}"
 
 
@@ -474,8 +622,13 @@ class Recommendation(models.Model):
         unique_together = ('user', 'movie_tvshow')
         ordering = ['-created_at']
 
-    def __str__(self):
-        return f"{self.movie_tvshow.title} для {self.user.username}"
+    def __str__(self) -> str:
+        """
+        Строковое представление рекомендации.
+        Returns:
+            str: Строка с именем пользователя и названием фильма
+        """
+        return f"Рекомендация {self.movie_tvshow.title} для {self.user.username}"
 
 
 class Rating(models.Model):
@@ -500,8 +653,13 @@ class Rating(models.Model):
         verbose_name_plural = _('Оценки')
         unique_together = ('user', 'movie_tvshow')
 
-    def __str__(self):
-        return f"{self.user.username}: {self.rating_value} для {self.movie_tvshow.title}"
+    def __str__(self) -> str:
+        """
+        Строковое представление оценки.
+        Returns:
+            str: Строка с именем пользователя, названием фильма и оценкой
+        """
+        return f"{self.user.username} оценил {self.movie_tvshow.title} на {self.rating_value}"
 
 
 class Review(models.Model):
@@ -563,19 +721,36 @@ class Review(models.Model):
         verbose_name_plural = _('Отзывы')
         ordering = ['-created_at']
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Строковое представление отзыва.
+        Returns:
+            str: Строка с именем пользователя и названием фильма
+        """
         return f"Отзыв от {self.user.username} на {self.movie_tvshow.title}"
     
-    def get_likes_count(self):
-        """Получить количество лайков из связанной таблицы (точное значение)"""
+    def get_likes_count(self) -> int:
+        """
+        Получить количество лайков из связанной таблицы (точное значение).
+        Returns:
+            int: Количество лайков
+        """
         return self.votes.filter(vote_type='like').count()
     
-    def get_dislikes_count(self):
-        """Получить количество дизлайков из связанной таблицы (точное значение)"""
+    def get_dislikes_count(self) -> int:
+        """
+        Получить количество дизлайков из связанной таблицы (точное значение).
+        Returns:
+            int: Количество дизлайков
+        """
         return self.votes.filter(vote_type='dislike').count()
     
-    def get_rating(self):
-        """Рассчитать рейтинг отзыва в процентах"""
+    def get_rating(self) -> float:
+        """
+        Рассчитать рейтинг отзыва в процентах.
+        Returns:
+            float: Рейтинг отзыва в процентах
+        """
         likes = self.get_likes_count()
         dislikes = self.get_dislikes_count()
         total = likes + dislikes
@@ -583,13 +758,15 @@ class Review(models.Model):
             return 0
         return (likes / total) * 100
     
-    def update_counts(self):
-        """Обновить счетчики лайков и дизлайков"""
+    def update_counts(self) -> None:
+        """
+        Обновить счетчики лайков и дизлайков.
+        """
         self.likes_count = self.get_likes_count()
         self.dislikes_count = self.get_dislikes_count()
         self.save(update_fields=['likes_count', 'dislikes_count'])
     
-    def days_since_posted(self):
+    def days_since_posted(self) -> int:
         """
         Пример 3: Расчет количества дней с момента публикации отзыва
         
@@ -601,48 +778,79 @@ class Review(models.Model):
         - Сортировки отзывов по давности
         - Выделения недавних отзывов (например, "Новый отзыв!" для отзывов менее 3 дней)
         - Анализа активности пользователей
+        
+        Returns:
+            int: Количество дней с момента публикации отзыва
         """
         now = timezone.now()
         time_diff = now - self.created_at
         return time_diff.days
     
-    def is_fresh(self):
-        """Проверяет, является ли отзыв свежим (опубликован менее 7 дней назад)"""
+    def is_fresh(self) -> bool:
+        """
+        Проверяет, является ли отзыв свежим (опубликован менее 7 дней назад).
+        Returns:
+            bool: True если отзыв свежий, False в противном случае
+        """
         return self.days_since_posted() < 7
     
-    def is_approved(self):
-        """Проверяет, одобрен ли отзыв"""
+    def is_approved(self) -> bool:
+        """
+        Проверяет, одобрен ли отзыв.
+        Returns:
+            bool: True если отзыв одобрен, False в противном случае
+        """
         return self.moderation_status == 'approved'
     
-    def is_pending(self):
-        """Проверяет, находится ли отзыв на модерации"""
+    def is_pending(self) -> bool:
+        """
+        Проверяет, находится ли отзыв на модерации.
+        Returns:
+            bool: True если отзыв на модерации, False в противном случае
+        """
         return self.moderation_status == 'pending'
     
-    def is_rejected(self):
-        """Проверяет, отклонен ли отзыв"""
+    def is_rejected(self) -> bool:
+        """
+        Проверяет, отклонен ли отзыв.
+        Returns:
+            bool: True если отзыв отклонен, False в противном случае
+        """
         return self.moderation_status == 'rejected'
     
-    def approve(self, moderator):
-        """Одобрить отзыв"""
+    def approve(self, moderator: User) -> None:
+        """
+        Одобрить отзыв.
+        Args:
+            moderator: Пользователь-модератор
+        """
         self.moderation_status = 'approved'
         self.moderated_by = moderator
         self.moderated_at = timezone.now()
         self.rejection_reason = ''
         self.save()
     
-    def reject(self, moderator, reason=''):
-        """Отклонить отзыв"""
+    def reject(self, moderator: User, reason: str = '') -> None:
+        """
+        Отклонить отзыв.
+        Args:
+            moderator: Пользователь-модератор
+            reason: Причина отклонения
+        """
         self.moderation_status = 'rejected'
         self.moderated_by = moderator
         self.moderated_at = timezone.now()
         self.rejection_reason = reason
         self.save()
     
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         """
         Возвращает URL для просмотра отзыва.
         Поскольку отзыв отображается на странице фильма/сериала, 
         мы перенаправляем на страницу фильма/сериала с якорем на отзыв.
+        
+        Returns:
+            str: URL страницы фильма с якорем на отзыв
         """
         return reverse('movie_detail', kwargs={'pk': self.movie_tvshow.pk}) + f'#review-{self.pk}'
 
@@ -674,8 +882,13 @@ class ReviewVote(models.Model):
         verbose_name_plural = _('Оценки отзывов')
         unique_together = ('review', 'user')
 
-    def __str__(self):
-        return f"{self.user.username}: {self.get_vote_type_display()} для отзыва {self.review.id}"
+    def __str__(self) -> str:
+        """
+        Строковое представление оценки отзыва.
+        Returns:
+            str: Строка с именем пользователя, типом оценки и отзывом
+        """
+        return f"{self.user.username} {self.get_vote_type_display()} отзыв {self.review.id}"
 
 
 class UserWatchlist(models.Model):
@@ -708,5 +921,10 @@ class UserWatchlist(models.Model):
         unique_together = ('user', 'movie_tvshow')
         ordering = ['-added_at']
 
-    def __str__(self):
-        return f"{self.movie_tvshow.title} - {self.get_status_display()} ({self.user.username})"
+    def __str__(self) -> str:
+        """
+        Строковое представление элемента списка просмотра.
+        Returns:
+            str: Строка с именем пользователя, названием фильма и статусом
+        """
+        return f"{self.user.username} - {self.movie_tvshow.title} ({self.get_status_display()})"

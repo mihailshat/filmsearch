@@ -2,13 +2,19 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from typing import Any, Dict, Optional, List
 from .models import MovieTVShow, Genre, Review, Collection, UserProfile
 from datetime import date
 import re
 
 
 class MovieTVShowForm(forms.ModelForm):
-    """Форма для создания и редактирования фильмов/сериалов с улучшенной валидацией"""
+    """
+    Форма для создания и редактирования фильмов/сериалов с улучшенной валидацией.
+    
+    Предоставляет комплексную валидацию данных для фильмов и сериалов,
+    включая проверку соответствия полей типу контента.
+    """
     
     class Meta:
         model = MovieTVShow
@@ -66,7 +72,12 @@ class MovieTVShowForm(forms.ModelForm):
             })
         }
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Инициализация формы с настройкой полей.
+        
+        Устанавливает обязательные поля и добавляет help_text.
+        """
         super().__init__(*args, **kwargs)
         # Делаем некоторые поля обязательными
         self.fields['title'].required = True
@@ -81,8 +92,16 @@ class MovieTVShowForm(forms.ModelForm):
         self.fields['end_date'].help_text = "Дата завершения для сериалов"
         self.fields['status'].help_text = "Статус для сериалов"
     
-    def clean_title(self):
-        """Валидация названия"""
+    def clean_title(self) -> str:
+        """
+        Валидация названия.
+        
+        Returns:
+            str: Очищенное название
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         title = self.cleaned_data.get('title')
         if not title:
             raise ValidationError("Название обязательно для заполнения")
@@ -95,8 +114,16 @@ class MovieTVShowForm(forms.ModelForm):
         
         return title.strip()
     
-    def clean_release_date(self):
-        """Валидация даты выхода"""
+    def clean_release_date(self) -> date:
+        """
+        Валидация даты выхода.
+        
+        Returns:
+            date: Валидная дата выхода
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         release_date = self.cleaned_data.get('release_date')
         if not release_date:
             raise ValidationError("Дата выхода обязательна для заполнения")
@@ -110,8 +137,16 @@ class MovieTVShowForm(forms.ModelForm):
         
         return release_date
     
-    def clean_duration(self):
-        """Валидация продолжительности"""
+    def clean_duration(self) -> Optional[int]:
+        """
+        Валидация продолжительности.
+        
+        Returns:
+            Optional[int]: Валидная продолжительность или None
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         duration = self.cleaned_data.get('duration')
         movie_type = self.cleaned_data.get('type')
         
@@ -126,8 +161,16 @@ class MovieTVShowForm(forms.ModelForm):
         
         return duration
     
-    def clean_seasons_count(self):
-        """Валидация количества сезонов"""
+    def clean_seasons_count(self) -> Optional[int]:
+        """
+        Валидация количества сезонов.
+        
+        Returns:
+            Optional[int]: Валидное количество сезонов или None
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         seasons_count = self.cleaned_data.get('seasons_count')
         movie_type = self.cleaned_data.get('type')
         
@@ -142,8 +185,16 @@ class MovieTVShowForm(forms.ModelForm):
         
         return seasons_count
     
-    def clean_episodes_count(self):
-        """Валидация количества эпизодов"""
+    def clean_episodes_count(self) -> Optional[int]:
+        """
+        Валидация количества эпизодов.
+        
+        Returns:
+            Optional[int]: Валидное количество эпизодов или None
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         episodes_count = self.cleaned_data.get('episodes_count')
         seasons_count = self.cleaned_data.get('seasons_count')
         movie_type = self.cleaned_data.get('type')
@@ -159,8 +210,16 @@ class MovieTVShowForm(forms.ModelForm):
         
         return episodes_count
     
-    def clean_end_date(self):
-        """Валидация даты завершения"""
+    def clean_end_date(self) -> Optional[date]:
+        """
+        Валидация даты завершения.
+        
+        Returns:
+            Optional[date]: Валидная дата завершения или None
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         end_date = self.cleaned_data.get('end_date')
         release_date = self.cleaned_data.get('release_date')
         
@@ -169,8 +228,16 @@ class MovieTVShowForm(forms.ModelForm):
         
         return end_date
     
-    def clean_genres(self):
-        """Валидация жанров"""
+    def clean_genres(self) -> List[Genre]:
+        """
+        Валидация жанров.
+        
+        Returns:
+            List[Genre]: Список валидных жанров
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         genres = self.cleaned_data.get('genres')
         
         if not genres:
@@ -181,8 +248,18 @@ class MovieTVShowForm(forms.ModelForm):
         
         return genres
     
-    def clean(self):
-        """Общая валидация формы"""
+    def clean(self) -> Dict[str, Any]:
+        """
+        Общая валидация формы.
+        
+        Проверяет соответствие полей типу контента.
+        
+        Returns:
+            Dict[str, Any]: Очищенные данные формы
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         cleaned_data = super().clean()
         movie_type = cleaned_data.get('type')
         duration = cleaned_data.get('duration')
@@ -202,7 +279,11 @@ class MovieTVShowForm(forms.ModelForm):
 
 
 class GenreForm(forms.ModelForm):
-    """Форма для создания и редактирования жанров"""
+    """
+    Форма для создания и редактирования жанров.
+    
+    Предоставляет валидацию названий жанров с проверкой уникальности.
+    """
     
     class Meta:
         model = Genre
@@ -219,8 +300,16 @@ class GenreForm(forms.ModelForm):
             })
         }
     
-    def clean_name(self):
-        """Валидация названия жанра"""
+    def clean_name(self) -> str:
+        """
+        Валидация названия жанра.
+        
+        Returns:
+            str: Очищенное название жанра
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         name = self.cleaned_data.get('name')
         
         if not name:
@@ -243,7 +332,11 @@ class GenreForm(forms.ModelForm):
 
 
 class ReviewForm(forms.ModelForm):
-    """Форма для создания и редактирования отзывов"""
+    """
+    Форма для создания и редактирования отзывов.
+    
+    Предоставляет валидацию текста отзывов с проверкой длины и разнообразия.
+    """
     
     class Meta:
         model = Review
@@ -256,8 +349,16 @@ class ReviewForm(forms.ModelForm):
             })
         }
     
-    def clean_review_text(self):
-        """Валидация текста отзыва"""
+    def clean_review_text(self) -> str:
+        """
+        Валидация текста отзыва.
+        
+        Returns:
+            str: Очищенный текст отзыва
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         review_text = self.cleaned_data.get('review_text')
         
         if not review_text:
@@ -276,7 +377,11 @@ class ReviewForm(forms.ModelForm):
 
 
 class CollectionForm(forms.ModelForm):
-    """Форма для создания и редактирования подборок"""
+    """
+    Форма для создания и редактирования подборок.
+    
+    Предоставляет валидацию данных подборок с настройкой публичности.
+    """
     
     class Meta:
         model = Collection
@@ -304,7 +409,16 @@ class CollectionForm(forms.ModelForm):
             'is_public': 'Если отмечено, подборка будет видна всем пользователям'
         }
     
-    def clean_title(self):
+    def clean_title(self) -> str:
+        """
+        Валидация названия подборки.
+        
+        Returns:
+            str: Очищенное название подборки
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         title = self.cleaned_data.get('title')
         if len(title) < 3:
             raise forms.ValidationError('Название подборки должно содержать минимум 3 символа.')
@@ -312,7 +426,12 @@ class CollectionForm(forms.ModelForm):
 
 
 class UserProfileForm(forms.ModelForm):
-    """Форма для редактирования профиля пользователя"""
+    """
+    Форма для редактирования профиля пользователя.
+    
+    Расширяет стандартную форму пользователя дополнительными полями
+    для настройки предпочтений.
+    """
     
     first_name = forms.CharField(
         max_length=30,
@@ -335,7 +454,7 @@ class UserProfileForm(forms.ModelForm):
     )
     
     email = forms.EmailField(
-        required=False,
+        required=True,
         widget=forms.EmailInput(attrs={
             'class': 'form-control',
             'placeholder': 'email@example.com'
@@ -352,38 +471,52 @@ class UserProfileForm(forms.ModelForm):
             })
         }
         labels = {
-            'preferred_genres': 'Предпочитаемые жанры'
+            'preferred_genres': 'Любимые жанры'
+        }
+        help_texts = {
+            'preferred_genres': 'Выберите жанры для персонализации рекомендаций'
         }
     
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Инициализация формы с настройкой полей пользователя.
+        """
         super().__init__(*args, **kwargs)
-        
-        if user:
-            self.fields['first_name'].initial = user.first_name
-            self.fields['last_name'].initial = user.last_name
-            self.fields['email'].initial = user.email
+        if self.instance and self.instance.user:
+            self.fields['first_name'].initial = self.instance.user.first_name
+            self.fields['last_name'].initial = self.instance.user.last_name
+            self.fields['email'].initial = self.instance.user.email
     
-    def save(self, commit=True):
+    def save(self, commit: bool = True) -> UserProfile:
+        """
+        Сохранение формы с обновлением данных пользователя.
+        
+        Args:
+            commit: Сохранять ли изменения в базе данных
+            
+        Returns:
+            UserProfile: Обновленный профиль пользователя
+        """
         profile = super().save(commit=False)
         
-        if commit:
-            # Сохраняем данные пользователя
-            user = profile.user
-            user.first_name = self.cleaned_data['first_name']
-            user.last_name = self.cleaned_data['last_name']
-            user.email = self.cleaned_data['email']
+        if commit and self.instance and self.instance.user:
+            user = self.instance.user
+            user.first_name = self.cleaned_data.get('first_name', '')
+            user.last_name = self.cleaned_data.get('last_name', '')
+            user.email = self.cleaned_data.get('email', '')
             user.save()
-            
-            # Сохраняем профиль
             profile.save()
-            self.save_m2m()
         
         return profile 
 
 
 class CustomUserCreationForm(UserCreationForm):
-    """Форма регистрации с расширенной валидацией"""
+    """
+    Форма регистрации с расширенной валидацией.
+    
+    Расширяет стандартную форму создания пользователя дополнительными
+    полями и валидацией.
+    """
     
     email = forms.EmailField(
         required=True,
@@ -424,8 +557,16 @@ class CustomUserCreationForm(UserCreationForm):
             })
         }
     
-    def clean_username(self):
-        """Валидация имени пользователя"""
+    def clean_username(self) -> str:
+        """
+        Валидация имени пользователя.
+        
+        Returns:
+            str: Очищенное имя пользователя
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         username = self.cleaned_data.get('username')
         
         if not username:
@@ -437,52 +578,67 @@ class CustomUserCreationForm(UserCreationForm):
         if len(username) > 30:
             raise ValidationError("Имя пользователя не может быть длиннее 30 символов")
         
-        if not re.match(r'^[\w.@+-]+$', username):
-            raise ValidationError("Имя пользователя может содержать только буквы, цифры и символы @/./+/-/_")
+        if not re.match(r'^[a-zA-Z0-9_]+$', username):
+            raise ValidationError("Имя пользователя может содержать только буквы, цифры и знак подчеркивания")
         
-        if User.objects.filter(username=username).exists():
+        if User.objects.filter(username__iexact=username).exists():
             raise ValidationError("Пользователь с таким именем уже существует")
         
-        return username
+        return username.lower()
     
-    def clean_email(self):
-        """Валидация email"""
+    def clean_email(self) -> str:
+        """
+        Валидация email.
+        
+        Returns:
+            str: Очищенный email
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         email = self.cleaned_data.get('email')
         
-        if not email:
-            raise ValidationError("Email обязателен")
-        
-        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
-            raise ValidationError("Введите корректный email адрес")
-        
-        if User.objects.filter(email=email).exists():
+        if User.objects.filter(email__iexact=email).exists():
             raise ValidationError("Пользователь с таким email уже существует")
         
-        return email
+        return email.lower()
     
-    def clean_password1(self):
-        """Валидация пароля"""
-        password = self.cleaned_data.get('password1')
+    def clean_password1(self) -> str:
+        """
+        Валидация пароля.
         
-        if not password:
-            raise ValidationError("Пароль обязателен")
+        Returns:
+            str: Очищенный пароль
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
+        password = self.cleaned_data.get('password1')
         
         if len(password) < 8:
             raise ValidationError("Пароль должен содержать минимум 8 символов")
         
+        if not re.search(r'[A-Z]', password):
+            raise ValidationError("Пароль должен содержать хотя бы одну заглавную букву")
+        
+        if not re.search(r'[a-z]', password):
+            raise ValidationError("Пароль должен содержать хотя бы одну строчную букву")
+        
         if not re.search(r'\d', password):
             raise ValidationError("Пароль должен содержать хотя бы одну цифру")
         
-        if not re.search(r'[a-zA-Z]', password):
-            raise ValidationError("Пароль должен содержать хотя бы одну букву")
-        
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-            raise ValidationError("Пароль должен содержать хотя бы один специальный символ")
-        
         return password
     
-    def clean(self):
-        """Общая валидация формы"""
+    def clean(self) -> Dict[str, Any]:
+        """
+        Общая валидация формы.
+        
+        Returns:
+            Dict[str, Any]: Очищенные данные формы
+            
+        Raises:
+            ValidationError: При нарушении правил валидации
+        """
         cleaned_data = super().clean()
         password1 = cleaned_data.get('password1')
         password2 = cleaned_data.get('password2')

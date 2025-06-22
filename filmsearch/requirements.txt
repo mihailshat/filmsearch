@@ -1,8 +1,10 @@
 Django==4.2.7
-Pillow==10.1.0
-python-decouple==3.8
+psycopg2-binary==2.9.9
 djangorestframework==3.14.0
+django-cors-headers==4.3.1
 django-filter==23.5
-WeasyPrint==56.1
+python-decouple==3.8
 sentry-sdk[django]==1.38.0
-django-cors-headers==4.3.1 
+django-silk==5.4.0
+Pillow==10.1.0
+WeasyPrint==56.1 

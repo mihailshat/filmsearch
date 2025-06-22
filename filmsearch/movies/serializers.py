@@ -1,23 +1,40 @@
 from rest_framework import serializers
 from django.db.models import Avg, Count
+from typing import Any, Dict, Optional, List
 from .models import MovieTVShow, Genre, ActorDirector, Review, Rating, Recommendation
 
 
 class GenreSerializer(serializers.ModelSerializer):
-    """Сериализатор для жанров"""
+    """
+    Сериализатор для жанров.
+    
+    Предоставляет данные о жанрах с количеством фильмов в каждом жанре.
+    """
     movies_count = serializers.SerializerMethodField()
     
     class Meta:
         model = Genre
         fields = ['id', 'name', 'description', 'movies_count']
     
-    def get_movies_count(self, obj):
-        """Количество фильмов в жанре"""
+    def get_movies_count(self, obj: Genre) -> int:
+        """
+        Количество фильмов в жанре.
+        
+        Args:
+            obj: Объект жанра
+            
+        Returns:
+            int: Количество фильмов в данном жанре
+        """
         return obj.movies.count()
 
 
 class ActorDirectorSerializer(serializers.ModelSerializer):
-    """Сериализатор для актеров/режиссеров"""
+    """
+    Сериализатор для актеров/режиссеров.
+    
+    Предоставляет данные об актерах и режиссерах с возрастом и количеством фильмов.
+    """
     age = serializers.SerializerMethodField()
     movies_count = serializers.SerializerMethodField()
     
@@ -25,17 +42,38 @@ class ActorDirectorSerializer(serializers.ModelSerializer):
         model = ActorDirector
         fields = ['id', 'full_name', 'birth_date', 'biography', 'photo_url', 'age', 'movies_count']
     
-    def get_age(self, obj):
-        """Возраст актера/режиссера"""
+    def get_age(self, obj: ActorDirector) -> Optional[int]:
+        """
+        Возраст актера/режиссера.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            Optional[int]: Возраст или None, если дата рождения не указана
+        """
         return obj.get_age()
     
-    def get_movies_count(self, obj):
-        """Количество фильмов с участием актера/режиссера"""
+    def get_movies_count(self, obj: ActorDirector) -> int:
+        """
+        Количество фильмов с участием актера/режиссера.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            int: Количество фильмов с участием данного актера/режиссера
+        """
         return obj.movies.count()
 
 
 class ReviewSerializer(serializers.ModelSerializer):
-    """Сериализатор для отзывов"""
+    """
+    Сериализатор для отзывов.
+    
+    Предоставляет данные об отзывах с дополнительной информацией о лайках,
+    рейтинге и свежести отзыва.
+    """
     user_username = serializers.CharField(source='user.username', read_only=True)
     movie_title = serializers.CharField(source='movie_tvshow.title', read_only=True)
     likes_count = serializers.SerializerMethodField()
@@ -49,25 +87,62 @@ class ReviewSerializer(serializers.ModelSerializer):
                  'likes_count', 'dislikes_count', 'rating_percentage', 
                  'is_fresh', 'created_at']
     
-    def get_likes_count(self, obj):
-        """Точное количество лайков"""
+    def get_likes_count(self, obj: Review) -> int:
+        """
+        Точное количество лайков.
+        
+        Args:
+            obj: Объект отзыва
+            
+        Returns:
+            int: Количество лайков отзыва
+        """
         return obj.get_likes_count()
     
-    def get_dislikes_count(self, obj):
-        """Точное количество дизлайков"""
+    def get_dislikes_count(self, obj: Review) -> int:
+        """
+        Точное количество дизлайков.
+        
+        Args:
+            obj: Объект отзыва
+            
+        Returns:
+            int: Количество дизлайков отзыва
+        """
         return obj.get_dislikes_count()
     
-    def get_rating_percentage(self, obj):
-        """Рейтинг отзыва в процентах"""
+    def get_rating_percentage(self, obj: Review) -> float:
+        """
+        Рейтинг отзыва в процентах.
+        
+        Args:
+            obj: Объект отзыва
+            
+        Returns:
+            float: Рейтинг отзыва в процентах
+        """
         return obj.get_rating()
     
-    def get_is_fresh(self, obj):
-        """Свежий ли отзыв (менее 7 дней)"""
+    def get_is_fresh(self, obj: Review) -> bool:
+        """
+        Свежий ли отзыв (менее 7 дней).
+        
+        Args:
+            obj: Объект отзыва
+            
+        Returns:
+            bool: True если отзыв свежий, False в противном случае
+        """
         return obj.is_fresh()
 
 
 class MovieTVShowSerializer(serializers.ModelSerializer):
-    """Сериализатор для фильмов/сериалов с SerializerMethodField и контекстом"""
+    """
+    Сериализатор для фильмов/сериалов с SerializerMethodField и контекстом.
+    
+    Предоставляет полную информацию о фильме/сериале с дополнительными
+    вычисляемыми полями и вложенными сериализаторами.
+    """
     
     formatted_duration = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
@@ -91,10 +166,16 @@ class MovieTVShowSerializer(serializers.ModelSerializer):
             'genres', 'actors_directors'
         ]
     
-    def get_formatted_duration(self, obj):
+    def get_formatted_duration(self, obj: MovieTVShow) -> Optional[str]:
         """
         Пример использования SerializerMethodField:
-        Форматирование продолжительности в часы и минуты
+        Форматирование продолжительности в часы и минуты.
+        
+        Args:
+            obj: Объект фильма/сериала
+            
+        Returns:
+            Optional[str]: Отформатированная продолжительность или None
         """
         if not obj.duration:
             return None
@@ -107,37 +188,88 @@ class MovieTVShowSerializer(serializers.ModelSerializer):
         else:
             return f"{minutes}мин"
     
-    def get_average_rating(self, obj):
-        """Средний рейтинг фильма"""
+    def get_average_rating(self, obj: MovieTVShow) -> float:
+        """
+        Средний рейтинг фильма.
+        
+        Args:
+            obj: Объект фильма/сериала
+            
+        Returns:
+            float: Средний рейтинг фильма/сериала
+        """
         return obj.get_average_rating()
     
-    def get_reviews_count(self, obj):
-        """Количество отзывов"""
+    def get_reviews_count(self, obj: MovieTVShow) -> int:
+        """
+        Количество отзывов.
+        
+        Args:
+            obj: Объект фильма/сериала
+            
+        Returns:
+            int: Количество отзывов на фильм/сериал
+        """
         return obj.reviews.count()
     
-    def get_ratings_count(self, obj):
-        """Количество оценок"""
+    def get_ratings_count(self, obj: MovieTVShow) -> int:
+        """
+        Количество оценок.
+        
+        Args:
+            obj: Объект фильма/сериала
+            
+        Returns:
+            int: Количество оценок фильма/сериала
+        """
         return obj.ratings.count()
     
-    def get_is_new_release(self, obj):
-        """Является ли новинкой"""
+    def get_is_new_release(self, obj: MovieTVShow) -> bool:
+        """
+        Является ли новинкой.
+        
+        Args:
+            obj: Объект фильма/сериала
+            
+        Returns:
+            bool: True если фильм/сериал новинка, False в противном случае
+        """
         return obj.is_new_release()
     
-    def get_days_since_release(self, obj):
-        """Дней с момента выхода"""
+    def get_days_since_release(self, obj: MovieTVShow) -> Optional[int]:
+        """
+        Дней с момента выхода.
+        
+        Args:
+            obj: Объект фильма/сериала
+            
+        Returns:
+            Optional[int]: Количество дней с момента выхода или None
+        """
         return obj.days_since_release()
     
-    def get_is_highlighted(self, obj):
+    def get_is_highlighted(self, obj: MovieTVShow) -> bool:
         """
         Пример использования контекста:
-        Проверяет, находится ли фильм в списке выделенных
+        Проверяет, находится ли фильм в списке выделенных.
+        
+        Args:
+            obj: Объект фильма/сериала
+            
+        Returns:
+            bool: True если фильм выделен, False в противном случае
         """
         highlighted_movies = self.context.get('highlighted_movies', [])
         return obj.id in highlighted_movies
 
 
 class MovieTVShowListSerializer(MovieTVShowSerializer):
-    """Упрощенный сериализатор для списка фильмов"""
+    """
+    Упрощенный сериализатор для списка фильмов.
+    
+    Предоставляет сокращенную информацию о фильмах/сериалах
+    для использования в списках и каталогах.
+    """
     
     class Meta(MovieTVShowSerializer.Meta):
         fields = [
@@ -148,7 +280,11 @@ class MovieTVShowListSerializer(MovieTVShowSerializer):
 
 
 class RecommendationSerializer(serializers.ModelSerializer):
-    """Сериализатор для рекомендаций"""
+    """
+    Сериализатор для рекомендаций.
+    
+    Предоставляет информацию о рекомендациях с данными о фильме и пользователе.
+    """
     movie = MovieTVShowListSerializer(source='movie_tvshow', read_only=True)
     user_username = serializers.CharField(source='user.username', read_only=True)
     
@@ -158,7 +294,11 @@ class RecommendationSerializer(serializers.ModelSerializer):
 
 
 class RatingSerializer(serializers.ModelSerializer):
-    """Сериализатор для рейтингов"""
+    """
+    Сериализатор для рейтингов.
+    
+    Предоставляет информацию об оценках фильмов/сериалов с данными о пользователе.
+    """
     user_username = serializers.CharField(source='user.username', read_only=True)
     movie_title = serializers.CharField(source='movie_tvshow.title', read_only=True)
     
@@ -168,7 +308,11 @@ class RatingSerializer(serializers.ModelSerializer):
 
 
 class MovieTVShowCreateSerializer(serializers.ModelSerializer):
-    """Сериализатор для создания фильмов/сериалов через API"""
+    """
+    Сериализатор для создания фильмов/сериалов через API.
+    
+    Предоставляет валидацию и обработку данных при создании новых фильмов/сериалов.
+    """
     
     class Meta:
         model = MovieTVShow
@@ -178,8 +322,21 @@ class MovieTVShowCreateSerializer(serializers.ModelSerializer):
             'age_restriction', 'poster_url', 'country', 'genres'
         ]
     
-    def validate(self, data):
-        """Дополнительная валидация данных"""
+    def validate(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Дополнительная валидация данных.
+        
+        Проверяет соответствие полей типу контента (фильм/сериал).
+        
+        Args:
+            data: Данные для валидации
+            
+        Returns:
+            Dict[str, Any]: Валидированные данные
+            
+        Raises:
+            serializers.ValidationError: При нарушении правил валидации
+        """
         # Проверяем соответствие полей типу контента
         if data.get('type') == 'movie':
             if not data.get('duration'):

@@ -3,9 +3,14 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Q, QuerySet
 from django.utils import timezone
 from datetime import timedelta
+from typing import Any, Dict, List, Optional, Type
+from rest_framework.request import Request
+from rest_framework.serializers import Serializer
+from rest_framework.views import APIView
+from django.http import HttpRequest
 from .models import MovieTVShow, Genre, ActorDirector, Review, Rating, Recommendation
 from .serializers import (
     MovieTVShowSerializer, MovieTVShowListSerializer, MovieTVShowCreateSerializer, GenreSerializer,
@@ -15,10 +20,35 @@ from .filters import (
     MovieTVShowFilter, ReviewFilter, RatingFilter,
     GenreFilter, ActorDirectorFilter
 )
+from rest_framework.reverse import reverse
+
+
+@api_view(['GET'])
+def api_root(request: HttpRequest, format: str = None) -> Response:
+    """
+    Корневой эндпоинт API.
+
+    Предоставляет список доступных эндпоинтов.
+    """
+    return Response({
+        'homepage': reverse('api_homepage', request=request, format=format),
+        'movies': reverse('api_movie_list', request=request, format=format),
+        'genres': reverse('api_genre_list', request=request, format=format),
+        'actors': reverse('api_actor_list', request=request, format=format),
+        'reviews': reverse('api_review_list', request=request, format=format),
+        'ratings': reverse('api_rating_list', request=request, format=format),
+        'recommendations': reverse('api_recommendation_list', request=request, format=format),
+        'search': reverse('api_search_movies', request=request, format=format),
+        'profile': reverse('api_profile', request=request, format=format),
+        'collections': reverse('api_collections', request=request, format=format),
+    })
 
 
 class MovieTVShowListAPIView(generics.ListCreateAPIView):
-    """API для списка фильмов/сериалов с фильтрацией и поиском"""
+    """
+    API для списка фильмов/сериалов с фильтрацией и поиском.
+    Позволяет получать и создавать фильмы/сериалы с поддержкой фильтров, поиска и сортировки.
+    """
     queryset = MovieTVShow.objects.all()
     serializer_class = MovieTVShowSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -27,14 +57,22 @@ class MovieTVShowListAPIView(generics.ListCreateAPIView):
     ordering_fields = ['release_date', 'title', 'created_at']
     ordering = ['-release_date']
     
-    def get_serializer_class(self):
-        """Возвращает разные сериализаторы для разных действий"""
+    def get_serializer_class(self) -> Type[Serializer]:
+        """
+        Возвращает разные сериализаторы для разных действий (POST/GET).
+        Returns:
+            Type[Serializer]: Класс сериализатора
+        """
         if self.request.method == 'POST':
             return MovieTVShowCreateSerializer
         return MovieTVShowListSerializer
     
-    def get_queryset(self):
-        """Оптимизированный queryset с аннотациями"""
+    def get_queryset(self) -> QuerySet:
+        """
+        Оптимизированный queryset с аннотациями для фильтрации и поиска.
+        Returns:
+            QuerySet: Queryset фильмов/сериалов
+        """
         queryset = MovieTVShow.objects.prefetch_related(
             'genres',
             'reviews',
@@ -57,22 +95,32 @@ class MovieTVShowListAPIView(generics.ListCreateAPIView):
 
         return queryset
     
-    def get_serializer_context(self):
-        """Передача контекста с выделенными фильмами"""
+    def get_serializer_context(self) -> Dict[str, Any]:
+        """
+        Передача контекста с выделенными фильмами.
+        Returns:
+            dict: Контекст для сериализатора
+        """
         context = super().get_serializer_context()
-        highlighted_movies = [1, 3, 5, 7] 
+        highlighted_movies: List[int] = [1, 3, 5, 7] 
         context['highlighted_movies'] = highlighted_movies
         
         return context
 
 
 class MovieTVShowDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
-    """API для детального просмотра фильма/сериала"""
+    """
+    API для детального просмотра, обновления и удаления фильма/сериала.
+    """
     queryset = MovieTVShow.objects.all()
     serializer_class = MovieTVShowSerializer
     
-    def get_queryset(self):
-        """Оптимизированный queryset для детального просмотра"""
+    def get_queryset(self) -> QuerySet:
+        """
+        Оптимизированный queryset для детального просмотра.
+        Returns:
+            QuerySet: Queryset фильмов/сериалов
+        """
         return MovieTVShow.objects.select_related().prefetch_related(
             'genres', 'reviews__user', 'ratings'
         ).annotate(
@@ -81,30 +129,43 @@ class MovieTVShowDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
             ratings_count=Count('ratings')
         )
     
-    def get_serializer_context(self):
-        """Передача контекста"""
+    def get_serializer_context(self) -> Dict[str, Any]:
+        """
+        Передача контекста для сериализатора.
+        Returns:
+            dict: Контекст для сериализатора
+        """
         context = super().get_serializer_context()
-        highlighted_movies = [1, 3, 5, 7]
+        highlighted_movies: List[int] = [1, 3, 5, 7]
         context['highlighted_movies'] = highlighted_movies
         return context
 
 
 class GenreListAPIView(generics.ListCreateAPIView):
-    """API для списка жанров"""
+    """
+    API для списка и создания жанров.
+    """
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_class = GenreFilter
     search_fields = ['name']
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
+        """
+        Queryset жанров с аннотацией количества фильмов.
+        Returns:
+            QuerySet: Queryset жанров
+        """
         return Genre.objects.annotate(
             movies_count=Count('movies')
         ).order_by('name')
 
 
 class ActorDirectorListAPIView(generics.ListCreateAPIView):
-    """API для списка актеров/режиссеров"""
+    """
+    API для списка и создания актеров/режиссеров.
+    """
     queryset = ActorDirector.objects.all()
     serializer_class = ActorDirectorSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -113,40 +174,61 @@ class ActorDirectorListAPIView(generics.ListCreateAPIView):
     ordering_fields = ['full_name', 'birth_date']
     ordering = ['full_name']
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet:
+        """
+        Queryset актеров/режиссеров с аннотацией количества фильмов.
+        Returns:
+            QuerySet: Queryset актеров/режиссеров
+        """
         return ActorDirector.objects.annotate(
             movies_count=Count('movies')
         )
 
 
 class ReviewListAPIView(generics.ListCreateAPIView):
-    """API для списка отзывов"""
+    """
+    API для списка и создания отзывов.
+    """
     serializer_class = ReviewSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = ReviewFilter
     ordering_fields = ['created_at']
     ordering = ['-created_at']
     
-    def get_queryset(self):
-        """Queryset с предзагрузкой связанных объектов"""
+    def get_queryset(self) -> QuerySet:
+        """
+        Queryset с предзагрузкой связанных объектов.
+        Returns:
+            QuerySet: Queryset отзывов
+        """
         return Review.objects.select_related(
             'user', 'movie_tvshow'
         ).prefetch_related('votes')
     
-    def perform_create(self, serializer):
-        """Автоматически устанавливаем пользователя при создании отзыва"""
-        # Для демонстрации используем первого пользователя, если не авторизован
+    def perform_create(self, serializer: Serializer) -> None:
+        """
+        Автоматически устанавливаем пользователя при создании отзыва.
+        Args:
+            serializer: Сериализатор отзыва
+        """
         from django.contrib.auth.models import User
         user = self.request.user if self.request.user.is_authenticated else User.objects.first()
         serializer.save(user=user)
 
 
 class RecommendationListAPIView(generics.ListAPIView):
-    """API для списка рекомендаций пользователя"""
+    """
+    API для списка рекомендаций пользователя.
+    Возвращает рекомендации для текущего пользователя, либо создает демо-рекомендации.
+    """
     serializer_class = RecommendationSerializer
     
-    def get_queryset(self):
-        """Рекомендации для текущего пользователя"""
+    def get_queryset(self) -> QuerySet:
+        """
+        Рекомендации для текущего пользователя.
+        Returns:
+            QuerySet: Queryset рекомендаций
+        """
         if self.request.user.is_authenticated:
             recommendations = Recommendation.objects.filter(
                 user=self.request.user
@@ -186,21 +268,32 @@ class RecommendationListAPIView(generics.ListAPIView):
 
 
 class RatingListAPIView(generics.ListCreateAPIView):
-    """API для списка рейтингов"""
+    """
+    API для списка и создания рейтингов.
+    """
     serializer_class = RatingSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = RatingFilter
     ordering_fields = ['created_at', 'rating_value']
     ordering = ['-created_at']
     
-    def get_queryset(self):
-        """Queryset с предзагрузкой связанных объектов"""
+    def get_queryset(self) -> QuerySet:
+        """
+        Queryset с предзагрузкой связанных объектов.
+        Returns:
+            QuerySet: Queryset рейтингов
+        """
         return Rating.objects.select_related(
             'user', 'movie_tvshow'
         )
     
-    def perform_create(self, serializer):
-        """Автоматически устанавливаем пользователя при создании рейтинга"""
+    def perform_create(self, serializer: Serializer) -> None:
+        """
+        Автоматически устанавливаем пользователя при создании рейтинга.
+        Если рейтинг уже существует — обновляем его.
+        Args:
+            serializer: Сериализатор рейтинга
+        """
         from django.contrib.auth.models import User
         user = self.request.user if self.request.user.is_authenticated else User.objects.first()
         
@@ -220,9 +313,15 @@ class RatingListAPIView(generics.ListCreateAPIView):
 
 
 @api_view(['GET'])
-def movie_statistics_api(request):
-    """API для статистики фильмов"""
-    
+def movie_statistics_api(request: Request) -> Response:
+    """
+    API для статистики фильмов.
+    Возвращает общую статистику, топ-рейтинговые, самые обсуждаемые и новые фильмы.
+    Args:
+        request: Запрос DRF
+    Returns:
+        Response: DRF Response с данными статистики
+    """
     # Общая статистика
     total_movies = MovieTVShow.objects.filter(type='movie').count()
     total_tv_shows = MovieTVShow.objects.filter(type='tv_show').count()
@@ -280,15 +379,20 @@ def movie_statistics_api(request):
 
 
 @api_view(['GET'])
-def search_movies_api(request):
-    """API для поиска фильмов с расширенными фильтрами"""
-    
+def search_movies_api(request: Request) -> Response:
+    """
+    API для поиска фильмов с расширенными фильтрами.
+    Args:
+        request: Запрос DRF
+    Returns:
+        Response: DRF Response с результатами поиска
+    """
     # Получаем параметры поиска
-    query = request.GET.get('q', '')
-    genre_ids = request.GET.getlist('genres')
-    type_filter = request.GET.get('type', '')
-    year = request.GET.get('year', '')
-    min_rating = request.GET.get('min_rating', '')
+    query: str = request.GET.get('q', '')
+    genre_ids: List[str] = request.GET.getlist('genres')
+    type_filter: str = request.GET.get('type', '')
+    year: str = request.GET.get('year', '')
+    min_rating: str = request.GET.get('min_rating', '')
     
     # Базовый queryset с оптимизацией
     movies = MovieTVShow.objects.select_related().prefetch_related(

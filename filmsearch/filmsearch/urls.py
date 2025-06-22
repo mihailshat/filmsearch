@@ -28,6 +28,7 @@ def trigger_error(request):
 
 urlpatterns = [
     path('sentry-debug/', trigger_error),  
+    path('silk/', include('silk.urls', namespace='silk')),  
     path('admin/', admin.site.urls),
     path('movies/', include('movies.urls')),
     path('api/', include('movies.api_urls')),  # API endpoints

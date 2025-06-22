@@ -1,17 +1,29 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.request import Request
 from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from datetime import timedelta
+from typing import Any, Dict, List, Optional
 from .models import MovieTVShow, Genre, Review
 from .serializers import MovieTVShowSerializer, GenreSerializer
 
 
 @api_view(['GET'])
-def homepage_data(request):
+def homepage_data(request: Request) -> Response:
     """
-    API endpoint для получения всех данных главной страницы
-    Возвращает данные для всех 3 виджетов одним запросом
+    API endpoint для получения всех данных главной страницы.
+    
+    Возвращает данные для всех 3 виджетов одним запросом:
+    - Топ фильмов по рейтингу
+    - Популярные жанры
+    - Новинки (последние 30 дней)
+    
+    Args:
+        request: DRF Request объект
+        
+    Returns:
+        Response: JSON с данными для главной страницы
     """
     
     # 1. Топ фильмов по рейтингу (черещ AVG)
@@ -37,7 +49,7 @@ def homepage_data(request):
         new_releases = MovieTVShow.objects.all().order_by('-release_date')[:6]
     
     # Сериализация данных
-    top_movies_data = []
+    top_movies_data: List[Dict[str, Any]] = []
     for movie in top_movies:
         movie_data = {
             'id': movie.id,
@@ -56,7 +68,7 @@ def homepage_data(request):
         }
         top_movies_data.append(movie_data)
     
-    popular_genres_data = []
+    popular_genres_data: List[Dict[str, Any]] = []
     for genre in popular_genres:
         # Получаем примеры фильмов этого жанра
         example_movies = genre.movies.all()[:4]
@@ -76,7 +88,7 @@ def homepage_data(request):
         }
         popular_genres_data.append(genre_data)
     
-    new_releases_data = []
+    new_releases_data: List[Dict[str, Any]] = []
     for movie in new_releases:
         # Вычисляем is_new_release
         days_since_release = (timezone.now().date() - movie.release_date).days
@@ -106,10 +118,18 @@ def homepage_data(request):
 
 
 @api_view(['GET'])
-def search_movies(request):
+def search_movies(request: Request) -> Response:
     """
-    API endpoint для поиска фильмов
-    Поддерживает поиск по названию, описанию, жанрам
+    API endpoint для поиска фильмов.
+    
+    Поддерживает поиск по названию, описанию, жанрам.
+    Возвращает ограниченный список результатов (до 20 фильмов).
+    
+    Args:
+        request: DRF Request объект
+        
+    Returns:
+        Response: JSON с результатами поиска
     """
     query = request.GET.get('q', '').strip()
     
@@ -125,7 +145,7 @@ def search_movies(request):
     # Ограничиваем результаты
     movies = movies[:20]
     
-    results = []
+    results: List[Dict[str, Any]] = []
     for movie in movies:
         movie_data = {
             'id': movie.id,
@@ -149,9 +169,22 @@ def search_movies(request):
 
 
 @api_view(['GET'])
-def movie_detail_api(request, movie_id):
+def movie_detail_api(request: Request, movie_id: int) -> Response:
     """
-    API endpoint для получения детальной информации о фильме
+    API endpoint для получения детальной информации о фильме.
+    
+    Возвращает полную информацию о фильме включая:
+    - Основные данные фильма
+    - Средний рейтинг и количество оценок
+    - Последние одобренные отзывы
+    - Жанры
+    
+    Args:
+        request: DRF Request объект
+        movie_id: int — ID фильма
+        
+    Returns:
+        Response: JSON с детальной информацией о фильме или ошибка 404
     """
     try:
         movie = MovieTVShow.objects.get(id=movie_id)
@@ -162,7 +195,7 @@ def movie_detail_api(request, movie_id):
         
         # Получаем отзывы
         reviews = movie.reviews.filter(moderation_status='approved').order_by('-created_at')[:5]
-        reviews_data = []
+        reviews_data: List[Dict[str, Any]] = []
         for review in reviews:
             reviews_data.append({
                 'id': review.id,

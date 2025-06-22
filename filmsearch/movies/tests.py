@@ -95,8 +95,8 @@ class APITestCase(TestCase):
         self.client = Client()
         self.register_data = {
             'username': 'newuser',
-            'password1': 'newpassword123!',
-            'password2': 'newpassword123!',
+            'password1': 'NewPassword123',
+            'password2': 'NewPassword123',
             'email': 'newuser@test.com'
         }
         self.login_data = {'username': 'user', 'password': 'password123'}

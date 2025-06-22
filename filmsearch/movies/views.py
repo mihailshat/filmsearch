@@ -8,23 +8,49 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, D
 from django.utils import timezone
 from django.urls import reverse, reverse_lazy
 from django.contrib import messages
-from django.http import HttpResponseRedirect, HttpResponseForbidden, Http404
+from django.http import HttpResponseRedirect, HttpResponseForbidden, Http404, HttpRequest, HttpResponse
+from django.db.models import QuerySet
+from typing import Dict, Any, Optional, Tuple
 from .models import MovieTVShow, ActorDirector, Review, Genre, Collection, UserProfile, Rating, Recommendation
 from django.db.models import Avg, Count, Sum, Max, Min, F, ExpressionWrapper, FloatField, Q
 from .forms import MovieTVShowForm, GenreForm, ReviewForm, CollectionForm, UserProfileForm, CustomUserCreationForm
 from .admin import admin_movie_pdf
 
-def is_admin(user):
-    """Проверяет, является ли пользователь администратором"""
+def is_admin(user: User) -> bool:
+    """
+    Проверяет, является ли пользователь администратором.
+    
+    Args:
+        user: Пользователь для проверки
+        
+    Returns:
+        bool: True если пользователь является администратором, False в противном случае
+    """
     return user.is_authenticated and (user.is_staff or user.is_superuser)
 
-def is_regular_user(user):
-    """Проверяет, является ли пользователь обычным зарегистрированным пользователем"""
+def is_regular_user(user: User) -> bool:
+    """
+    Проверяет, является ли пользователь обычным зарегистрированным пользователем.
+    
+    Args:
+        user: Пользователь для проверки
+        
+    Returns:
+        bool: True если пользователь аутентифицирован, False в противном случае
+    """
     return user.is_authenticated
 
 
-def register_view(request):
-    """Регистрация нового пользователя"""
+def register_view(request: HttpRequest) -> HttpResponse:
+    """
+    Регистрация нового пользователя.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponse: Ответ с формой регистрации или редирект после успешной регистрации
+    """
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
@@ -39,8 +65,16 @@ def register_view(request):
     return render(request, 'registration/register.html', {'form': form})
 
 @login_required
-def profile_view(request):
-    """Профиль пользователя"""
+def profile_view(request: HttpRequest) -> HttpResponse:
+    """
+    Профиль пользователя.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponse: Ответ с данными профиля пользователя
+    """
     profile, created = UserProfile.objects.get_or_create(user=request.user)
     
     # статистика 
@@ -60,8 +94,16 @@ def profile_view(request):
     return render(request, 'movies/profile.html', context)
 
 @login_required
-def profile_edit_view(request):
-    """Редактирование профиля пользователя"""
+def profile_edit_view(request: HttpRequest) -> HttpResponse:
+    """
+    Редактирование профиля пользователя.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponse: Ответ с формой редактирования профиля или редирект после сохранения
+    """
     profile, created = UserProfile.objects.get_or_create(user=request.user)
     
     if request.method == 'POST':
@@ -81,42 +123,102 @@ def profile_edit_view(request):
 
 
 class AdminRequiredMixin(UserPassesTestMixin):
-    """Миксин для проверки прав администратора"""
-    def test_func(self):
+    """
+    Миксин для проверки прав администратора.
+    
+    Проверяет, что пользователь является администратором перед выполнением действий.
+    """
+    
+    def test_func(self) -> bool:
+        """
+        Проверяет права администратора.
+        
+        Returns:
+            bool: True если пользователь является администратором
+        """
         return is_admin(self.request.user)
     
-    def handle_no_permission(self):
+    def handle_no_permission(self) -> HttpResponseRedirect:
+        """
+        Обрабатывает случай отсутствия прав доступа.
+        
+        Returns:
+            HttpResponseRedirect: Редирект на список фильмов с сообщением об ошибке
+        """
         messages.error(self.request, 'У вас нет прав для выполнения этого действия.')
         return redirect('movie_list')
 
 class MovieTVShowCreateView(AdminRequiredMixin, CreateView):
-    """Создание фильма/сериала (только для админов)"""
+    """
+    Создание фильма/сериала (только для админов).
+    
+    Представление для создания новых фильмов и сериалов.
+    Доступно только администраторам.
+    """
     model = MovieTVShow
     form_class = MovieTVShowForm
     template_name = 'movies/movie_form.html'
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['title'] = 'Добавить фильм/сериал'
         context['submit_text'] = 'Создать'
         context['is_admin_action'] = True
         return context
 
-    def form_valid(self, form):
+    def form_valid(self, form) -> HttpResponseRedirect:
+        """
+        Обрабатывает валидную форму.
+        
+        Args:
+            form: Валидная форма
+            
+        Returns:
+            HttpResponseRedirect: Редирект после успешного создания
+        """
         response = super().form_valid(form)
         messages.success(self.request, f'{form.instance.get_type_display()} "{form.instance.title}" успешно создан!')
         return response
 
 class MovieTVShowUpdateView(AdminRequiredMixin, UpdateView):
-    """Редактирование фильма/сериала (только для админов)"""
+    """
+    Редактирование фильма/сериала (только для админов).
+    
+    Представление для редактирования существующих фильмов и сериалов.
+    Доступно только администраторам.
+    """
     model = MovieTVShow
     form_class = MovieTVShowForm
     template_name = 'movies/movie_form.html'
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[MovieTVShow]:
+        """
+        Возвращает QuerySet с оптимизированными запросами.
+        
+        Returns:
+            QuerySet[MovieTVShow]: QuerySet с предзагруженными связанными объектами
+        """
         return MovieTVShow.objects.select_related().prefetch_related('genres')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['title'] = f'Редактировать {self.object.get_type_display().lower()}'
         context['submit_text'] = 'Сохранить изменения'
@@ -125,17 +227,42 @@ class MovieTVShowUpdateView(AdminRequiredMixin, UpdateView):
         return context
 
 class MovieTVShowDeleteView(AdminRequiredMixin, DeleteView):
-    """Удаление фильма/сериала (только для админов)"""
+    """
+    Удаление фильма/сериала (только для админов).
+    
+    Представление для удаления фильмов и сериалов.
+    Доступно только администраторам.
+    """
     model = MovieTVShow
     template_name = 'movies/movie_confirm_delete.html'
     success_url = reverse_lazy('movie_list')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['is_admin_action'] = True
         return context
     
-    def delete(self, request, *args, **kwargs):
+    def delete(self, request: HttpRequest, *args, **kwargs) -> HttpResponseRedirect:
+        """
+        Удаляет объект и показывает сообщение об успехе.
+        
+        Args:
+            request: HTTP запрос
+            *args: Дополнительные аргументы
+            **kwargs: Дополнительные именованные аргументы
+            
+        Returns:
+            HttpResponseRedirect: Редирект после успешного удаления
+        """
         movie = self.get_object()
         movie_title = movie.title
         movie_type = movie.get_type_display()
@@ -146,13 +273,27 @@ class MovieTVShowDeleteView(AdminRequiredMixin, DeleteView):
 
 
 class GenreCreateView(AdminRequiredMixin, CreateView):
-    """Создание жанра (только для админов)"""
+    """
+    Создание жанра (только для админов).
+    
+    Представление для создания новых жанров.
+    Доступно только администраторам.
+    """
     model = Genre
     form_class = GenreForm
     template_name = 'movies/genre_form.html'
     success_url = reverse_lazy('genre_list')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['title'] = 'Добавить жанр'
         context['submit_text'] = 'Создать жанр'
@@ -160,13 +301,27 @@ class GenreCreateView(AdminRequiredMixin, CreateView):
         return context
 
 class GenreUpdateView(AdminRequiredMixin, UpdateView):
-    """Редактирование жанра (только для админов)"""
+    """
+    Редактирование жанра (только для админов).
+    
+    Представление для редактирования существующих жанров.
+    Доступно только администраторам.
+    """
     model = Genre
     form_class = GenreForm
     template_name = 'movies/genre_form.html'
     success_url = reverse_lazy('genre_list')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['title'] = f'Редактировать жанр "{self.object.name}"'
         context['submit_text'] = 'Сохранить изменения'
@@ -175,25 +330,50 @@ class GenreUpdateView(AdminRequiredMixin, UpdateView):
         return context
 
 class GenreDeleteView(AdminRequiredMixin, DeleteView):
-    """Удаление жанра (только для админов)"""
+    """
+    Удаление жанра (только для админов).
+    
+    Представление для удаления жанров.
+    Доступно только администраторам.
+    """
     model = Genre
     template_name = 'movies/genre_confirm_delete.html'
     success_url = reverse_lazy('genre_list')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['is_admin_action'] = True
         return context
 
 
 class CollectionListView(ListView):
-    """Список подборок"""
+    """
+    Список подборок.
+    
+    Отображает список подборок с учетом прав доступа пользователя.
+    Показывает публичные подборки и подборки текущего пользователя.
+    """
     model = Collection
     template_name = 'movies/collection_list.html'
     context_object_name = 'collections'
     paginate_by = 12
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Collection]:
+        """
+        Возвращает QuerySet с подборками с учетом прав доступа.
+        
+        Returns:
+            QuerySet[Collection]: QuerySet с подборками для текущего пользователя
+        """
         queryset = Collection.objects.annotate(
             items_count=Count('items')
         ).order_by('-created_at')
@@ -209,15 +389,37 @@ class CollectionListView(ListView):
         return queryset
 
 class CollectionDetailView(DetailView):
-    """Детальный просмотр подборки"""
+    """
+    Детальный просмотр подборки.
+    
+    Отображает детальную информацию о подборке с проверкой прав доступа.
+    """
     model = Collection
     template_name = 'movies/collection_detail.html'
     context_object_name = 'collection'
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Collection]:
+        """
+        Возвращает QuerySet с оптимизированными запросами.
+        
+        Returns:
+            QuerySet[Collection]: QuerySet с предзагруженными связанными объектами
+        """
         return Collection.objects.prefetch_related('items__movie_tvshow__genres')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+            
+        Raises:
+            Http404: Если у пользователя нет прав доступа к подборке
+        """
         context = super().get_context_data(**kwargs)
         collection = self.object
         
@@ -230,64 +432,139 @@ class CollectionDetailView(DetailView):
             self.request.user == collection.user or 
             is_admin(self.request.user)
         )
+        context['can_delete'] = context['can_edit']
+        
         return context
 
 class CollectionCreateView(LoginRequiredMixin, CreateView):
-    """Создание подборки (для авторизованных пользователей)"""
+    """
+    Создание подборки (для авторизованных пользователей).
+    
+    Представление для создания новых подборок.
+    Доступно только авторизованным пользователям.
+    """
     model = Collection
     form_class = CollectionForm
     template_name = 'movies/collection_form.html'
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['title'] = 'Создать подборку'
         context['submit_text'] = 'Создать'
         return context
     
-    def form_valid(self, form):
+    def form_valid(self, form) -> HttpResponseRedirect:
+        """
+        Обрабатывает валидную форму.
+        
+        Args:
+            form: Валидная форма
+            
+        Returns:
+            HttpResponseRedirect: Редирект после успешного создания
+        """
         form.instance.user = self.request.user
-        form.instance.is_system = False
         response = super().form_valid(form)
         messages.success(self.request, f'Подборка "{form.instance.title}" успешно создана!')
         return response
 
 class CollectionUpdateView(LoginRequiredMixin, UpdateView):
-    """Редактирование подборки (автор или админ)"""
+    """
+    Редактирование подборки (автор или админ).
+    
+    Представление для редактирования существующих подборок.
+    Доступно автору подборки или администраторам.
+    """
     model = Collection
     form_class = CollectionForm
     template_name = 'movies/collection_form.html'
     
-    def get_queryset(self):
-        # Пользователь может редактировать только свои подборки, админ - любые
+    def get_queryset(self) -> QuerySet[Collection]:
+        """
+        Возвращает QuerySet с учетом прав доступа.
+        Пользователь может редактировать только свои подборки, админ - любые.
+        
+        Returns:
+            QuerySet[Collection]: QuerySet с подборками для редактирования
+        """
         if is_admin(self.request.user):
             return Collection.objects.all()
         return Collection.objects.filter(user=self.request.user)
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['title'] = f'Редактировать подборку "{self.object.title}"'
         context['submit_text'] = 'Сохранить изменения'
         context['is_edit'] = True
         return context
     
-    def form_valid(self, form):
+    def form_valid(self, form) -> HttpResponseRedirect:
+        """
+        Обрабатывает валидную форму.
+        
+        Args:
+            form: Валидная форма
+            
+        Returns:
+            HttpResponseRedirect: Редирект после успешного обновления
+        """
         response = super().form_valid(form)
         messages.success(self.request, f'Подборка "{form.instance.title}" успешно обновлена!')
         return response
 
 class CollectionDeleteView(LoginRequiredMixin, DeleteView):
-    """Удаление подборки (автор или админ)"""
+    """
+    Удаление подборки (автор или админ).
+    
+    Представление для удаления подборок.
+    Доступно автору подборки или администраторам.
+    """
     model = Collection
     template_name = 'movies/collection_confirm_delete.html'
     success_url = reverse_lazy('collection_list')
     
-    def get_queryset(self):
-        # Пользователь может удалять только свои подборки, админ - любые
+    def get_queryset(self) -> QuerySet[Collection]:
+        """
+        Возвращает QuerySet с учетом прав доступа.
+        Пользователь может удалять только свои подборки, админ - любые.
+        
+        Returns:
+            QuerySet[Collection]: QuerySet с подборками для удаления
+        """
         if is_admin(self.request.user):
             return Collection.objects.all()
         return Collection.objects.filter(user=self.request.user)
     
-    def delete(self, request, *args, **kwargs):
+    def delete(self, request: HttpRequest, *args, **kwargs) -> HttpResponseRedirect:
+        """
+        Удаляет объект и показывает сообщение об успехе.
+        
+        Args:
+            request: HTTP запрос
+            *args: Дополнительные аргументы
+            **kwargs: Дополнительные именованные аргументы
+            
+        Returns:
+            HttpResponseRedirect: Редирект после успешного удаления
+        """
         collection = self.get_object()
         collection_title = collection.title
         
@@ -297,18 +574,41 @@ class CollectionDeleteView(LoginRequiredMixin, DeleteView):
 
 
 class ReviewCreateView(LoginRequiredMixin, CreateView):
-    """Создание отзыва (для авторизованных пользователей)"""
+    """
+    Создание отзыва (для авторизованных пользователей).
+    
+    Представление для создания новых отзывов на фильмы/сериалы.
+    Доступно только авторизованным пользователям.
+    """
     model = Review
     form_class = ReviewForm
     template_name = 'movies/review_form.html'
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         movie_id = self.kwargs.get('movie_id')
         context['movie'] = get_object_or_404(MovieTVShow, pk=movie_id)
         return context
     
-    def form_valid(self, form):
+    def form_valid(self, form) -> HttpResponseRedirect:
+        """
+        Обрабатывает валидную форму.
+        
+        Args:
+            form: Валидная форма
+            
+        Returns:
+            HttpResponseRedirect: Редирект после успешного создания или ошибки
+        """
         form.instance.user = self.request.user
         movie_id = self.kwargs.get('movie_id')
         form.instance.movie_tvshow = get_object_or_404(MovieTVShow, pk=movie_id)
@@ -327,36 +627,86 @@ class ReviewCreateView(LoginRequiredMixin, CreateView):
         return response
 
 class ReviewUpdateView(LoginRequiredMixin, UpdateView):
-    """Редактирование отзыва (автор или админ)"""
+    """
+    Редактирование отзыва (автор или админ).
+    
+    Представление для редактирования существующих отзывов.
+    Доступно автору отзыва или администраторам.
+    """
     model = Review
     form_class = ReviewForm
     template_name = 'movies/review_form.html'
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Review]:
+        """
+        Возвращает QuerySet с учетом прав доступа.
+        Пользователь может редактировать только свои отзывы, админ - любые.
+        
+        Returns:
+            QuerySet[Review]: QuerySet с отзывами для редактирования
+        """
         if is_admin(self.request.user):
             return Review.objects.all()
         return Review.objects.filter(user=self.request.user)
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['movie'] = self.object.movie_tvshow
         context['is_edit'] = True
         return context
 
 class ReviewDeleteView(LoginRequiredMixin, DeleteView):
-    """Удаление отзыва (автор или админ)"""
+    """
+    Удаление отзыва (автор или админ).
+    
+    Представление для удаления отзывов.
+    Доступно автору отзыва или администраторам.
+    """
     model = Review
     template_name = 'movies/review_confirm_delete.html'
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Review]:
+        """
+        Возвращает QuerySet с учетом прав доступа.
+        Пользователь может удалять только свои отзывы, админ - любые.
+        
+        Returns:
+            QuerySet[Review]: QuerySet с отзывами для удаления
+        """
         if is_admin(self.request.user):
             return Review.objects.all()
         return Review.objects.filter(user=self.request.user)
     
-    def get_success_url(self):
+    def get_success_url(self) -> str:
+        """
+        Возвращает URL для редиректа после успешного удаления.
+        
+        Returns:
+            str: URL страницы фильма/сериала
+        """
         return reverse('movie_detail', kwargs={'pk': self.object.movie_tvshow.pk})
     
-    def delete(self, request, *args, **kwargs):
+    def delete(self, request: HttpRequest, *args, **kwargs) -> HttpResponseRedirect:
+        """
+        Удаляет объект и показывает сообщение об успехе.
+        
+        Args:
+            request: HTTP запрос
+            *args: Дополнительные аргументы
+            **kwargs: Дополнительные именованные аргументы
+            
+        Returns:
+            HttpResponseRedirect: Редирект после успешного удаления
+        """
         review = self.get_object()
         movie = review.movie_tvshow
         
@@ -366,8 +716,19 @@ class ReviewDeleteView(LoginRequiredMixin, DeleteView):
 
 
 @login_required
-def add_rating(request, movie_id):
-    """Добавление/обновление рейтинга"""
+def add_rating(request: HttpRequest, movie_id: int) -> HttpResponseRedirect:
+    """
+    Добавление/обновление рейтинга.
+    
+    Позволяет пользователю добавить или обновить свою оценку фильма/сериала.
+    
+    Args:
+        request: HTTP запрос
+        movie_id: ID фильма/сериала
+        
+    Returns:
+        HttpResponseRedirect: Редирект на страницу фильма/сериала
+    """
     if request.method == 'POST':
         movie = get_object_or_404(MovieTVShow, pk=movie_id)
         rating_value = request.POST.get('rating_value')
@@ -388,8 +749,18 @@ def add_rating(request, movie_id):
 
 
 @login_required
-def recommendations_view(request):
-    """Персональные рекомендации пользователя"""
+def recommendations_view(request: HttpRequest) -> HttpResponse:
+    """
+    Персональные рекомендации пользователя.
+    
+    Отображает список персональных рекомендаций для текущего пользователя.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponse: Ответ с рекомендациями пользователя
+    """
     recommendations = Recommendation.objects.filter(
         user=request.user
     ).select_related('movie_tvshow').prefetch_related(
@@ -403,8 +774,19 @@ def recommendations_view(request):
     return render(request, 'movies/recommendations.html', context)
 
 @user_passes_test(is_admin)
-def generate_recommendations(request):
-    """Генерация рекомендаций (только для админов)"""
+def generate_recommendations(request: HttpRequest) -> HttpResponseRedirect:
+    """
+    Генерация рекомендаций (только для админов).
+    
+    Генерирует персональные рекомендации для всех активных пользователей
+    на основе их оценок и предпочтений по жанрам.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponseRedirect: Редирект на панель администратора
+    """
     if request.method == 'POST':
         users = User.objects.filter(is_active=True)
         
@@ -440,8 +822,19 @@ def generate_recommendations(request):
 
 
 @user_passes_test(is_admin)
-def admin_dashboard(request):
-    """Панель администратора"""
+def admin_dashboard(request: HttpRequest) -> HttpResponse:
+    """
+    Панель администратора.
+    
+    Отображает статистику и управление системой.
+    Доступно только администраторам.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponse: Ответ с панелью администратора
+    """
     # Статистика
     stats = {
         'total_movies': MovieTVShow.objects.filter(type='movie').count(),
@@ -477,45 +870,46 @@ def admin_dashboard(request):
         'name', 'description'
     ).annotate(
         movies_count=Count('movies')
-    ).order_by('-movies_count')[:5]
-    
-    # === ДЕМОНСТРАЦИЯ values_list() ===
-    # Получаем только названия активных пользователей для быстрого списка
-    active_usernames = User.objects.filter(
-        is_active=True
-    ).values_list('username', flat=True).order_by('username')[:10]
-    
-    # Получаем пары (название фильма, тип) для отчетов
-    movie_type_pairs = MovieTVShow.objects.values_list(
-        'title', 'type'
-    ).order_by('-created_at')[:10]
-    
-    # Получаем ID всех жанров для массовых операций
-    genre_ids = Genre.objects.values_list('id', flat=True)
+    ).order_by('-movies_count')
     
     context = {
         'stats': stats,
         'recent_movies': recent_movies,
         'recent_reviews': recent_reviews,
         'active_users': active_users,
-        'movies_summary': list(movies_summary),
-        'genres_info': list(genres_info), 
-        'active_usernames': list(active_usernames),
-        'movie_type_pairs': list(movie_type_pairs),
-        'total_genre_ids': len(genre_ids),
+        'movies_summary': movies_summary,
+        'genres_info': genres_info,
     }
     
     return render(request, 'movies/admin_dashboard.html', context)
 
 
-def is_superuser(user):
-    """Проверяет, является ли пользователь суперпользователем"""
+def is_superuser(user: User) -> bool:
+    """
+    Проверяет, является ли пользователь суперпользователем.
+    
+    Args:
+        user: Пользователь для проверки
+        
+    Returns:
+        bool: True если пользователь является суперпользователем, False в противном случае
+    """
     return user.is_authenticated and user.is_superuser
 
 
 @user_passes_test(is_superuser)
-def manage_users(request):
-    """Управление пользователями (только для суперпользователей)"""
+def manage_users(request: HttpRequest) -> HttpResponse:
+    """
+    Управление пользователями (только для суперпользователей).
+    
+    Позволяет суперпользователям управлять правами других пользователей.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponse: Ответ с интерфейсом управления пользователями
+    """
     
     users = User.objects.annotate(
         reviews_count=Count('review'),
@@ -565,20 +959,30 @@ def manage_users(request):
 
 
 class MovieListView(ListView):
+    """
+    Список фильмов и сериалов.
+    
+    Отображает список всех фильмов и сериалов с возможностью поиска и фильтрации.
+    """
     model = MovieTVShow
     template_name = 'movies/movie_list.html'
     context_object_name = 'movies'
     paginate_by = 10
     
-    def get_queryset(self):
-        """Оптимизированный запрос с использованием select_related и prefetch_related"""
+    def get_queryset(self) -> QuerySet[MovieTVShow]:
+        """
+        Оптимизированный запрос с использованием select_related и prefetch_related.
+        
+        Returns:
+            QuerySet[MovieTVShow]: QuerySet с фильмами и сериалами
+        """
         queryset = MovieTVShow.objects.select_related().prefetch_related(
             'genres', 'actors_directors'
         ).annotate(
             avg_rating=Avg('ratings__rating_value'),
             reviews_count=Count('reviews')
         )
-        
+    
         search_query = self.request.GET.get('search')
         if search_query:
             queryset = queryset.filter(
@@ -595,7 +999,16 @@ class MovieListView(ListView):
             
         return queryset
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['now'] = timezone.now()
         context['new_releases'] = MovieTVShow.objects.select_related().prefetch_related(
@@ -610,11 +1023,22 @@ class MovieListView(ListView):
         return context
 
 class MovieDetailView(DetailView):
+    """
+    Детальный просмотр фильма/сериала.
+    
+    Отображает подробную информацию о фильме/сериале с отзывами и оценками.
+    """
     model = MovieTVShow
     template_name = 'movies/movie_detail.html'
     context_object_name = 'movie'
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[MovieTVShow]:
+        """
+        Возвращает QuerySet с оптимизированными запросами.
+        
+        Returns:
+            QuerySet[MovieTVShow]: QuerySet с предзагруженными связанными объектами
+        """
         return MovieTVShow.objects.select_related().prefetch_related(
             'genres', 'actors_directors', 'reviews__user', 'ratings'
         ).annotate(
@@ -622,7 +1046,16 @@ class MovieDetailView(DetailView):
             reviews_count=Count('reviews')
         )
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         movie = self.object
         
@@ -648,40 +1081,81 @@ class MovieDetailView(DetailView):
         return context
 
 class ActorDirectorListView(ListView):
-    """Список актеров и режиссеров"""
+    """
+    Список актеров и режиссеров.
+    
+    Отображает список всех актеров и режиссеров с количеством фильмов.
+    """
     model = ActorDirector
     template_name = 'movies/actor_list.html'
     context_object_name = 'actors'
     paginate_by = 20
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[ActorDirector]:
+        """
+        Возвращает QuerySet с количеством фильмов для каждого актера/режиссера.
+        
+        Returns:
+            QuerySet[ActorDirector]: QuerySet с актерами и режиссерами
+        """
         return ActorDirector.objects.annotate(
             movies_count=Count('movies')
-        ).order_by('name')
+        ).order_by('full_name')
 
 class ActorDirectorDetailView(DetailView):
+    """
+    Детальный просмотр актера/режиссера.
+    
+    Отображает подробную информацию об актере/режиссере с его фильмами.
+    """
     model = ActorDirector
     template_name = 'movies/actor_director_detail.html'
     context_object_name = 'person'
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[ActorDirector]:
+        """
+        Возвращает QuerySet с оптимизированными запросами.
+        
+        Returns:
+            QuerySet[ActorDirector]: QuerySet с предзагруженными связанными объектами
+        """
         return ActorDirector.objects.prefetch_related('movies__genres')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         person = self.object
         
-        movies = person.movies.select_related().prefetch_related('genres').annotate(
-            avg_rating=Avg('ratings__rating_value'),
-            reviews_count=Count('reviews')
-        ).order_by('-release_date')
+        # Разделяем фильмы по ролям
+        actor_roles = person.movie_roles.filter(role='actor').select_related('movie_tvshow')
+        director_roles = person.movie_roles.filter(role='director').select_related('movie_tvshow')
         
-        context['movies'] = movies
+        context['actor_roles'] = actor_roles
+        context['director_roles'] = director_roles
+        context['total_movies'] = person.movies.count()
+        
         return context
 
-
-def statistics_view(request):
-    """Статистика сайта"""
+def statistics_view(request: HttpRequest) -> HttpResponse:
+    """
+    Статистика сайта.
+    
+    Отображает общую статистику по сайту с различными метриками.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponse: Ответ со статистикой сайта
+    """
     stats = {
         'total_movies': MovieTVShow.objects.filter(type='movie').count(),
         'total_tv_shows': MovieTVShow.objects.filter(type='tv_show').count(),
@@ -744,9 +1218,18 @@ def statistics_view(request):
     
     return render(request, 'movies/statistics.html', context)
 
-
-def demo_page(request):
-    """Демонстрационная страница всех возможностей"""
+def demo_page(request: HttpRequest) -> HttpResponse:
+    """
+    Демонстрационная страница всех возможностей.
+    
+    Отображает базовую информацию о сайте для демонстрации.
+    
+    Args:
+        request: HTTP запрос
+        
+    Returns:
+        HttpResponse: Ответ с демонстрационной страницей
+    """
     context = {
         'total_movies': MovieTVShow.objects.count(),
         'total_genres': Genre.objects.count(),
@@ -758,8 +1241,20 @@ def demo_page(request):
     return render(request, 'movies/demo.html', context)
 
 @login_required
-def add_to_collection(request, collection_id, movie_id):
-    """Добавление фильма в подборку"""
+def add_to_collection(request: HttpRequest, collection_id: int, movie_id: int) -> HttpResponseRedirect:
+    """
+    Добавление фильма в подборку.
+    
+    Позволяет пользователю добавить фильм/сериал в свою подборку.
+    
+    Args:
+        request: HTTP запрос
+        collection_id: ID подборки
+        movie_id: ID фильма/сериала
+        
+    Returns:
+        HttpResponseRedirect: Редирект на страницу подборки
+    """
     collection = get_object_or_404(Collection, pk=collection_id)
     movie = get_object_or_404(MovieTVShow, pk=movie_id)
     
@@ -775,16 +1270,27 @@ def add_to_collection(request, collection_id, movie_id):
         from .models import CollectionItem
         CollectionItem.objects.create(
             collection=collection,
-            movie_tvshow=movie,
-            added_by=request.user
+            movie_tvshow=movie
         )
         messages.success(request, f'"{movie.title}" добавлен в подборку "{collection.title}"!')
     
     return redirect('collection_detail', pk=collection_id)
 
 @login_required
-def remove_from_collection(request, collection_id, movie_id):
-    """Удаление фильма из подборки"""
+def remove_from_collection(request: HttpRequest, collection_id: int, movie_id: int) -> HttpResponseRedirect:
+    """
+    Удаление фильма из подборки.
+    
+    Позволяет пользователю удалить фильм/сериал из своей подборки.
+    
+    Args:
+        request: HTTP запрос
+        collection_id: ID подборки
+        movie_id: ID фильма/сериала
+        
+    Returns:
+        HttpResponseRedirect: Редирект на страницу подборки
+    """
     collection = get_object_or_404(Collection, pk=collection_id)
     movie = get_object_or_404(MovieTVShow, pk=movie_id)
     
@@ -805,43 +1311,84 @@ def remove_from_collection(request, collection_id, movie_id):
 
 
 class GenreListView(ListView):
-    """Список жанров"""
+    """
+    Список жанров.
+    
+    Отображает список всех жанров с количеством фильмов в каждом.
+    """
     model = Genre
     template_name = 'movies/genre_list.html'
     context_object_name = 'genres'
     paginate_by = 20
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Genre]:
+        """
+        Возвращает QuerySet с количеством фильмов для каждого жанра.
+        
+        Returns:
+            QuerySet[Genre]: QuerySet с жанрами
+        """
         return Genre.objects.annotate(
         movies_count=Count('movies')
         ).order_by('name')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         context['is_admin'] = is_admin(self.request.user)
         context['is_authenticated'] = self.request.user.is_authenticated
         return context
 
 class GenreDetailView(DetailView):
-    """Детальный просмотр жанра"""
+    """
+    Детальный просмотр жанра.
+    
+    Отображает подробную информацию о жанре с его фильмами.
+    """
     model = Genre
     template_name = 'movies/genre_detail.html'
     context_object_name = 'genre'
     
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Genre]:
+        """
+        Возвращает QuerySet с оптимизированными запросами.
+        
+        Returns:
+            QuerySet[Genre]: QuerySet с предзагруженными связанными объектами
+        """
         return Genre.objects.prefetch_related('movies__genres')
     
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Добавляет дополнительные данные в контекст.
+        
+        Args:
+            **kwargs: Дополнительные аргументы контекста
+            
+        Returns:
+            Dict[str, Any]: Контекст с дополнительными данными
+        """
         context = super().get_context_data(**kwargs)
         genre = self.object
         
-        # Получаем фильмы этого жанра с оптимизацией
+        # Получаем фильмы этого жанра с дополнительной информацией
         movies = genre.movies.select_related().prefetch_related('genres').annotate(
             avg_rating=Avg('ratings__rating_value'),
             reviews_count=Count('reviews')
         ).order_by('-release_date')
         
         context['movies'] = movies
+        context['movies_count'] = movies.count()
         context['is_admin'] = is_admin(self.request.user)
         context['is_authenticated'] = self.request.user.is_authenticated
+        
         return context
+

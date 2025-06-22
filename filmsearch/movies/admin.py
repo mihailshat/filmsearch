@@ -1,11 +1,14 @@
 from django.contrib import admin, messages
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, QuerySet
 from django.utils.html import format_html, mark_safe
 from django.urls import reverse
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, HttpRequest
 from django.template.loader import render_to_string
 from django.contrib.admin.views.decorators import staff_member_required
 from django.conf import settings
+from typing import Any, Dict, List, Optional, Union
+from django.contrib.auth.models import User
+from django.forms import BaseModelForm
 import weasyprint
 from .models import (
     Genre, ActorDirector, MovieTVShow, MovieTVShowActorDirector,
@@ -16,7 +19,12 @@ from django.utils import timezone
 
 
 class MovieTVShowInline(admin.TabularInline):
-    """Встроенное отображение фильмов/сериалов для жанров"""
+    """
+    Встроенное отображение фильмов/сериалов для жанров.
+    
+    Показывает связанные фильмы и сериалы в админке жанров
+    с возможностью просмотра основных характеристик.
+    """
     model = MovieTVShow.genres.through
     extra = 0
     verbose_name = 'Фильм/Сериал'
@@ -24,47 +32,121 @@ class MovieTVShowInline(admin.TabularInline):
     raw_id_fields = ('movietvshow',)
     readonly_fields = ('get_title', 'get_type', 'get_release_date')
     
-    def get_title(self, obj):
+    def get_title(self, obj: Any) -> str:
+        """
+        Получение названия фильма/сериала.
+        
+        Args:
+            obj: Объект связи жанр-фильм
+            
+        Returns:
+            str: Название фильма/сериала
+        """
         return obj.movietvshow.title
     get_title.short_description = 'Название'
     
-    def get_type(self, obj):
+    def get_type(self, obj: Any) -> str:
+        """
+        Получение типа контента (фильм/сериал).
+        
+        Args:
+            obj: Объект связи жанр-фильм
+            
+        Returns:
+            str: Тип контента
+        """
         return obj.movietvshow.get_type_display()
     get_type.short_description = 'Тип'
     
-    def get_release_date(self, obj):
+    def get_release_date(self, obj: Any) -> str:
+        """
+        Получение даты выхода.
+        
+        Args:
+            obj: Объект связи жанр-фильм
+            
+        Returns:
+            str: Дата выхода
+        """
         return obj.movietvshow.release_date
     get_release_date.short_description = 'Дата выхода'
     
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request: HttpRequest, obj: Optional[Any] = None) -> bool:
+        """
+        Проверка права на добавление новых записей.
+        
+        Args:
+            request: HTTP запрос
+            obj: Объект модели
+            
+        Returns:
+            bool: False - добавление запрещено
+        """
         return False
 
 
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
-    """Админ-панель для модели Genre"""
+    """
+    Админ-панель для модели Genre.
+    
+    Предоставляет управление жанрами с отображением количества фильмов
+    и ссылками на связанные фильмы/сериалы.
+    """
     list_display = ('name', 'movies_count', 'show_movies_link')
     search_fields = ('name', 'description')
     list_per_page = 20
     inlines = [MovieTVShowInline]
     
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """
+        Оптимизированный queryset с аннотацией количества фильмов.
+        
+        Args:
+            request: HTTP запрос
+            
+        Returns:
+            QuerySet: Queryset с аннотацией movies_count_val
+        """
         qs = super().get_queryset(request)
         qs = qs.annotate(movies_count_val=Count('movies'))
         return qs
     
     @admin.display(description='Количество фильмов/сериалов', ordering='movies_count_val')
-    def movies_count(self, obj):
+    def movies_count(self, obj: Genre) -> int:
+        """
+        Количество фильмов/сериалов в жанре.
+        
+        Args:
+            obj: Объект жанра
+            
+        Returns:
+            int: Количество фильмов/сериалов
+        """
         return obj.movies.count()
     
     @admin.display(description='Фильмы/Сериалы')
-    def show_movies_link(self, obj):
+    def show_movies_link(self, obj: Genre) -> str:
+        """
+        Ссылка на список фильмов данного жанра.
+        
+        Args:
+            obj: Объект жанра
+            
+        Returns:
+            str: HTML ссылка на фильтрованный список
+        """
         url = reverse('admin:movies_movietvshow_changelist') + f'?genres__id__exact={obj.id}'
         return format_html('<a href="{}">Показать фильмы</a>', url)
 
 
 class MovieTVShowActorDirectorInline(admin.TabularInline):
-    """Встроенное отображение ролей в фильмах/сериалах"""
+    """
+    Встроенное отображение ролей в фильмах/сериалах.
+    
+    Показывает роли актеров и режиссеров в админке ActorDirector
+    с информацией о фильмах и типах ролей.
+    """
     model = MovieTVShowActorDirector
     extra = 0
     verbose_name = 'Роль в фильме/сериале'
@@ -73,22 +155,54 @@ class MovieTVShowActorDirectorInline(admin.TabularInline):
     readonly_fields = ('get_movie_title', 'get_movie_type', 'get_release_date')
     fields = ('movie_tvshow', 'get_movie_title', 'get_movie_type', 'get_release_date', 'role', 'character_name')
     
-    def get_movie_title(self, obj):
+    def get_movie_title(self, obj: MovieTVShowActorDirector) -> str:
+        """
+        Получение названия фильма/сериала.
+        
+        Args:
+            obj: Объект роли
+            
+        Returns:
+            str: Название фильма/сериала или '-'
+        """
         return obj.movie_tvshow.title if obj.movie_tvshow else '-'
     get_movie_title.short_description = 'Название'
     
-    def get_movie_type(self, obj):
+    def get_movie_type(self, obj: MovieTVShowActorDirector) -> str:
+        """
+        Получение типа контента.
+        
+        Args:
+            obj: Объект роли
+            
+        Returns:
+            str: Тип контента или '-'
+        """
         return obj.movie_tvshow.get_type_display() if obj.movie_tvshow else '-'
     get_movie_type.short_description = 'Тип'
     
-    def get_release_date(self, obj):
+    def get_release_date(self, obj: MovieTVShowActorDirector) -> str:
+        """
+        Получение даты выхода.
+        
+        Args:
+            obj: Объект роли
+            
+        Returns:
+            str: Дата выхода или '-'
+        """
         return obj.movie_tvshow.release_date if obj.movie_tvshow else '-'
     get_release_date.short_description = 'Дата выхода'
 
 
 @admin.register(ActorDirector)
 class ActorDirectorAdmin(admin.ModelAdmin):
-    """Админ-панель для модели ActorDirector"""
+    """
+    Админ-панель для модели ActorDirector.
+    
+    Предоставляет управление актерами и режиссерами с отображением
+    фото, резюме, количества фильмов и связанных ролей.
+    """
     list_display = ('full_name', 'birth_date', 'photo_display', 'resume_display', 'has_photo_file', 'has_resume_file', 'movies_count', 'show_movies_link')
     list_filter = ('birth_date', 'movie_roles__role')
     search_fields = ('full_name', 'biography')
@@ -115,14 +229,31 @@ class ActorDirectorAdmin(admin.ModelAdmin):
     inlines = [MovieTVShowActorDirectorInline]
     list_per_page = 20
     
-    def get_queryset(self, request):
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """
+        Оптимизированный queryset с аннотацией количества фильмов.
+        
+        Args:
+            request: HTTP запрос
+            
+        Returns:
+            QuerySet: Queryset с аннотацией movies_count_val
+        """
         qs = super().get_queryset(request)
         qs = qs.annotate(movies_count_val=Count('movies'))
         return qs
     
     @admin.display(description='Фото')
-    def photo_preview(self, obj):
-        """Предпросмотр фото в форме редактирования (приоритет файлу, затем URL)"""
+    def photo_preview(self, obj: ActorDirector) -> str:
+        """
+        Предпросмотр фото в форме редактирования (приоритет файлу, затем URL).
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            str: HTML изображение или '-'
+        """
         if obj.photo_image:
             return format_html('<img src="{}" width="50" height="50" style="object-fit: cover;" />', obj.photo_image.url)
         elif obj.photo_url:
@@ -130,8 +261,16 @@ class ActorDirectorAdmin(admin.ModelAdmin):
         return '-'
     
     @admin.display(description='Фото')
-    def photo_display(self, obj):
-        """Отображение фото в списке (приоритет файлу, затем URL)"""
+    def photo_display(self, obj: ActorDirector) -> str:
+        """
+        Отображение фото в списке (приоритет файлу, затем URL).
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            str: HTML изображение или '-'
+        """
         if obj.photo_image:
             return format_html('<img src="{}" width="40" height="40" style="object-fit: cover; border-radius: 4px;" title="Файл: {}" />', 
                             obj.photo_image.url, obj.photo_image.name.split('/')[-1])
@@ -141,8 +280,16 @@ class ActorDirectorAdmin(admin.ModelAdmin):
         return '-'
     
     @admin.display(description='Резюме')  
-    def resume_display(self, obj):
-        """Отображение информации о резюме в списке"""
+    def resume_display(self, obj: ActorDirector) -> str:
+        """
+        Отображение информации о резюме в списке.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            str: HTML ссылка на файл или '-'
+        """
         if obj.resume_file:
             file_size_mb = obj.resume_file.size / (1024 * 1024) 
             file_name = obj.resume_file.name.split('/')[-1]
@@ -157,8 +304,16 @@ class ActorDirectorAdmin(admin.ModelAdmin):
         return '-'
     
     @admin.display(description='Полное фото')
-    def photo_full(self, obj):
-        """Полное фото в форме редактирования (приоритет файлу, затем URL)"""
+    def photo_full(self, obj: ActorDirector) -> str:
+        """
+        Полное фото в форме редактирования (приоритет файлу, затем URL).
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            str: HTML изображение или '-'
+        """
         if obj.photo_image:
             return format_html('<img src="{}" width="300" />', obj.photo_image.url)
         elif obj.photo_url:
@@ -166,30 +321,84 @@ class ActorDirectorAdmin(admin.ModelAdmin):
         return '-'
     
     @admin.display(description='Количество фильмов/сериалов', ordering='movies_count_val')
-    def movies_count(self, obj):
+    def movies_count(self, obj: ActorDirector) -> int:
+        """
+        Количество фильмов/сериалов с участием актера/режиссера.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            int: Количество фильмов/сериалов
+        """
         return obj.movies.count()
     
     @admin.display(description='Фильмы/Сериалы')
-    def show_movies_link(self, obj):
+    def show_movies_link(self, obj: ActorDirector) -> str:
+        """
+        Ссылка на список фильмов с участием актера/режиссера.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            str: HTML ссылка на фильтрованный список
+        """
         url = reverse('admin:movies_movietvshow_changelist') + f'?actors_directors__id__exact={obj.id}'
         return format_html('<a href="{}">Показать фильмы</a>', url)
     
     @admin.display(description='Фото файл', boolean=True)
-    def has_photo_file(self, obj):
+    def has_photo_file(self, obj: ActorDirector) -> bool:
+        """
+        Проверка наличия файла фото.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            bool: True если есть файл фото
+        """
         return bool(obj.photo_image)
     
     @admin.display(description='Резюме файл', boolean=True)
-    def has_resume_file(self, obj):
+    def has_resume_file(self, obj: ActorDirector) -> bool:
+        """
+        Проверка наличия файла резюме.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            bool: True если есть файл резюме
+        """
         return bool(obj.resume_file)
     
     @admin.display(description='Предпросмотр фото файла')
-    def photo_file_preview(self, obj):
+    def photo_file_preview(self, obj: ActorDirector) -> str:
+        """
+        Предпросмотр файла фото.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            str: HTML изображение или '-'
+        """
         if obj.photo_image:
             return format_html('<img src="{}" width="100" height="100" style="object-fit: cover;" />', obj.photo_image.url)
         return '-'
     
     @admin.display(description='Информация о файле резюме')
-    def resume_file_info(self, obj):
+    def resume_file_info(self, obj: ActorDirector) -> str:
+        """
+        Информация о файле резюме с размером и ссылкой для скачивания.
+        
+        Args:
+            obj: Объект актера/режиссера
+            
+        Returns:
+            str: HTML с информацией о файле
+        """
         if obj.resume_file:
             file_size = obj.resume_file.size
             file_size_mb = file_size / (1024 * 1024)
